@@ -17,39 +17,33 @@
 
     tree1: '2 Objects/7 Decor/Tree1.png',
     tree2: '2 Objects/7 Decor/Tree2.png',
-    log: '2 Objects/7 Decor/Log1.png',
-    box: '2 Objects/7 Decor/Box1.png',
-    lamp: '2 Objects/7 Decor/Lamp1.png',
-    dirt1: '2 Objects/7 Decor/Dirt1.png',
 
-    tent: '2 Objects/8 Camp/1.png',
-    tent2: '2 Objects/8 Camp/3.png',
-    fence: '2 Objects/2 Fence/1.png',
-
-    stone1: '2 Objects/4 Stone/1.png',
-    stone2: '2 Objects/4 Stone/5.png',
-    stone3: '2 Objects/4 Stone/9.png',
-    stone4: '2 Objects/4 Stone/13.png',
-    stoneSmall: '2 Objects/4 Stone/2.png',
-
-    bush1: '2 Objects/9 Bush/1.png',
-    bush2: '2 Objects/9 Bush/3.png',
-    bush3: '2 Objects/9 Bush/5.png',
-
-    grass1: '2 Objects/5 Grass/1.png',
-    grass2: '2 Objects/5 Grass/3.png',
-    grass3: '2 Objects/5 Grass/5.png',
-
-    flower1: '2 Objects/6 Flower/1.png',
-    flower2: '2 Objects/6 Flower/5.png',
-    flower3: '2 Objects/6 Flower/9.png',
-
-    towerPlace1: '2 Objects/PlaceForTower1.png',
-    towerPlace2: '2 Objects/PlaceForTower2.png',
-
-    shadow: '2 Objects/1 Shadow/1.png',
-    pointer: '2 Objects/3 Pointer/1.png'
+    aniflag: '3 Animated Objects/1 Flag/1.png',
+    fireSmoke: '3 Animated Objects/2 Campfire/1.png',
+    fireFlame: '3 Animated Objects/2 Campfire/2.png'
   };
+
+  function addNumbered(prefix, folder, count, ext) {
+    for (var i = 1; i <= count; i++) {
+      FILES[prefix + i] = folder + i + (ext || '.png');
+    }
+  }
+
+  addNumbered('stone', '2 Objects/4 Stone/', 16);
+  addNumbered('bush', '2 Objects/9 Bush/', 6);
+  addNumbered('grass', '2 Objects/5 Grass/', 6);
+  addNumbered('flower', '2 Objects/6 Flower/', 12);
+  addNumbered('dirt', '2 Objects/7 Decor/Dirt', 6);
+  addNumbered('log', '2 Objects/7 Decor/Log', 4);
+  addNumbered('box', '2 Objects/7 Decor/Box', 4);
+  addNumbered('lamp', '2 Objects/7 Decor/Lamp', 6);
+  addNumbered('tent', '2 Objects/8 Camp/', 6);
+  addNumbered('fence', '2 Objects/2 Fence/', 10);
+  addNumbered('pointer', '2 Objects/3 Pointer/', 6);
+  addNumbered('shadow', '2 Objects/1 Shadow/', 6);
+
+  FILES.towerPlace1 = '2 Objects/PlaceForTower1.png';
+  FILES.towerPlace2 = '2 Objects/PlaceForTower2.png';
 
   var images = {};
   var failed = {};
@@ -113,6 +107,27 @@
     return true;
   }
 
+  /** Кадр из горизонтальной полосы анимации. */
+  function frame(ctx, name, index, frames, x, y, w, h) {
+    var img = get(name);
+    if (!img || !ctx) return false;
+    var fw = img.naturalWidth / frames;
+    var fh = img.naturalHeight;
+    var idx = ((index % frames) + frames) % frames;
+    var old = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, Math.round(idx * fw), 0, fw, fh,
+      Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+    ctx.imageSmoothingEnabled = old;
+    return true;
+  }
+
+  function size(name) {
+    var img = get(name);
+    if (!img) return null;
+    return { w: img.naturalWidth, h: img.naturalHeight };
+  }
+
   function ready() {
     var total = Object.keys(FILES).length;
     return loadedCount + Object.keys(failed).length >= total;
@@ -125,6 +140,8 @@
     get: get,
     has: has,
     draw: draw,
+    frame: frame,
+    size: size,
     tile: tile,
     ready: ready,
     loaded: function () { return loadedCount; },

@@ -86,21 +86,21 @@
     this.routeCells = this.grid.getPath();
     this.refreshPath();
     this.decor = this.buildDecor();
-    this.camps = this.findCamps();
     this.spots = this.computeSpots(C.buildSpots);
     this.spotKeys = {};
     for (var si = 0; si < this.spots.length; si++) {
       this.spotKeys[this.spots[si].c + ',' + this.spots[si].r] = true;
     }
+    this.camps = this.findCamps();
   }
 
   /** Уголки карты под декоративные палатки (не на маршруте). */
   Game.prototype.findCamps = function () {
     var corners = [
-      { c: 0, r: this.grid.rows - 1 },
-      { c: this.grid.cols - 1, r: 0 },
-      { c: 0, r: 0 },
-      { c: this.grid.cols - 1, r: this.grid.rows - 1 }
+      { c: 1, r: 1 },
+      { c: this.grid.cols - 2, r: 1 },
+      { c: 1, r: this.grid.rows - 2 },
+      { c: this.grid.cols - 2, r: this.grid.rows - 2 }
     ];
     var out = [];
     for (var i = 0; i < corners.length; i++) {
@@ -109,9 +109,10 @@
       if (this.onPath(p.c, p.r)) continue;
       if (this.grid.spawn.c === p.c && this.grid.spawn.r === p.r) continue;
       if (this.grid.base.c === p.c && this.grid.base.r === p.r) continue;
+      if (this.isSpot(p.c, p.r)) continue;
       out.push(p);
     }
-    return out.slice(0, 2);
+    return out.slice(0, 3);
   };
 
   /**
@@ -217,6 +218,7 @@
           patch: ch === '.' && n2 > 0.8 && n2 < 0.84,
           prop: ch === '.' && n3 > 0.94,
           propType: (n3 > 0.97 ? 'box' : 'log'),
+          pebble: ch === '.' && n3 > 0.78 && n3 < 0.81,
           flip: n > 0.5,
           deco: TD.hash('deco:' + c + ':' + r + ':' + this.levelIndex)
         });
@@ -969,9 +971,19 @@
         TD.Sprites.draw(ctx, 'rock', x, y, cell, cell);
         ctx.restore();
         if (A && A.has('stone3')) {
-          var bigStone = ['stone3', 'stone4', 'stone1'][d.deco % 3];
-          A.draw(ctx, bigStone, x + 1, y + 6, cell - 2, cell - 9);
-          A.draw(ctx, 'stoneSmall', x + cell * 0.58, y + cell * 0.58, 14 * k, 11 * k);
+          var bigStones = ['stone3', 'stone9', 'stone11', 'stone13', 'stone15'];
+          var stoneKey = bigStones[d.deco % bigStones.length];
+          var info = A.size(stoneKey);
+          var bw = cell * 0.95;
+          var bh = info ? bw * (info.h / info.w) : cell * 0.7;
+          if (bh > cell * 0.95) {
+            bh = cell * 0.95;
+            bw = info ? bh * (info.w / info.h) : cell * 0.95;
+          }
+          A.draw(ctx, stoneKey, x + (cell - bw) / 2, y + cell - bh - 2 * k, bw, bh);
+
+          var smallStones = ['stone2', 'stone5', 'stone6', 'stone10', 'stone14'];
+          A.draw(ctx, smallStones[d.deco % smallStones.length], x + cell * 0.58, y + cell * 0.58, 14 * k, 11 * k);
         } else {
           TD.Sprites.draw(ctx, 'rock', x, y, cell, cell);
         }
@@ -1008,18 +1020,22 @@
         }
 
         if (A && A.has('dirt1') && d.patch) {
-          A.draw(ctx, 'dirt1', x + 12 * k + (d.deco % 8), y + 14 * k + (d.deco % 6), 17 * k, 14 * k);
+          A.draw(ctx, 'dirt' + (1 + d.deco % 6), x + 12 * k + (d.deco % 8), y + 14 * k + (d.deco % 6), 17 * k, 14 * k);
         }
         if (A && A.has('grass1') && d.tuft) {
-          A.draw(ctx, 'grass' + (1 + d.deco % 3), x + 8 * k + (d.deco % 14), y + 16 * k, 12 * k, 14 * k);
+          A.draw(ctx, 'grass' + (1 + d.deco % 6), x + 8 * k + (d.deco % 14), y + 16 * k, 12 * k, 14 * k);
         } else if (d.dot) {
           ctx.fillStyle = pal.dot;
           ctx.fillRect(x + 8 * k + (d.flip ? 14 * k : 0), y + 9 * k, 2 * k, 2 * k);
           ctx.fillRect(x + 22 * k, y + 26 * k, 2 * k, 2 * k);
         }
         if (A && A.has('flower1') && d.flower) {
-          A.draw(ctx, 'flower' + (1 + d.deco % 3),
+          A.draw(ctx, 'flower' + (1 + d.deco % 12),
             x + 6 * k + (d.deco % 20), y + 8 * k + ((d.deco >> 3) % 18), 12 * k, 12 * k);
+        }
+        if (A && A.has('stone1') && d.pebble) {
+          A.draw(ctx, 'stone' + (1 + d.deco % 16),
+            x + 8 * k + (d.deco % 16), y + 22 * k + (d.deco % 8), 12 * k, 10 * k);
         }
       }
     }
@@ -1038,8 +1054,8 @@
       if (d.bush) {
         ctx.save();
         ctx.globalAlpha = 0.35;
-        if (A && A.has('shadow')) {
-          A.draw(ctx, 'shadow', tx + 4 * k, ty + 28 * k, cell - 8 * k, 10 * k);
+        if (A && A.has('shadow1')) {
+          A.draw(ctx, 'shadow' + (1 + d.deco % 6), tx + 4 * k, ty + 28 * k, cell - 8 * k, 10 * k);
         }
         ctx.restore();
         if (A && A.has('tree1')) {
@@ -1053,36 +1069,40 @@
         }
       } else if (d.shrub) {
         if (A && A.has('bush1')) {
-          A.draw(ctx, 'bush' + (1 + d.deco % 3), tx + 6 * k, ty + 9 * k, 30 * k, 27 * k);
+          A.draw(ctx, 'bush' + (1 + d.deco % 6), tx + 6 * k, ty + 9 * k, 30 * k, 27 * k);
         }
       } else if (d.prop) {
-        if (A && A.has(d.propType)) {
+        if (A && A.has('log1')) {
           if (d.propType === 'box') {
-            A.draw(ctx, 'box', tx + 10 * k, ty + 12 * k, 22 * k, 21 * k);
+            A.draw(ctx, 'box' + (1 + d.deco % 4), tx + 10 * k, ty + 12 * k, 22 * k, 21 * k);
           } else {
-            A.draw(ctx, 'log', tx + 6 * k, ty + 18 * k, 30 * k, 19 * k);
+            A.draw(ctx, 'log' + (1 + d.deco % 4), tx + 6 * k, ty + 18 * k, 30 * k, 19 * k);
           }
         }
       }
     }
 
     /* палатки в уголках карты */
-    if (A && A.has('tent')) {
+    if (A && A.has('tent1')) {
       for (var ci = 0; ci < this.camps.length; ci++) {
         var camp = this.camps[ci];
         var cx = camp.c * cell;
         var cy = camp.r * cell;
-        if (A.has('shadow')) {
+        if (A.has('shadow1')) {
           ctx.save();
           ctx.globalAlpha = 0.4;
-          A.draw(ctx, 'shadow', cx + 4 * k, cy + 30 * k, cell - 8 * k, 9 * k);
+          A.draw(ctx, 'shadow' + (1 + ci % 6), cx + 4 * k, cy + 30 * k, cell - 8 * k, 9 * k);
           ctx.restore();
         }
-        A.draw(ctx, ci % 2 ? 'tent2' : 'tent', cx - 8 * k, cy - 4 * k, 56 * k, 36 * k);
+        A.draw(ctx, 'tent' + (1 + (ci * 2 + this.levelIndex) % 6), cx - 8 * k, cy - 4 * k, 56 * k, 36 * k);
+        this.drawCampfire(ctx, cx, cy, ci);
+        this.drawCampFlag(ctx, cx, cy, ci);
       }
     }
 
     this.drawLamps(ctx);
+    this.drawRoadFences(ctx);
+    this.drawRoadFlags(ctx);
 
     /* портал */
     var sp = g.cellCenter(g.spawn.c, g.spawn.r);
@@ -1097,13 +1117,51 @@
     TD.Sprites.draw(ctx, 'heart', bp.x - cell / 2, bp.y - cell / 2, cell, cell);
   };
 
+  /** Костёр с дымом у палатки. */
+  Game.prototype.drawCampfire = function (ctx, cx, cy, seed) {
+    var A = TD.Assets;
+    if (!A || !A.has('fireFlame')) return;
+    var cell = this.grid.cell;
+    var k = cell / 40;
+    var f = Math.floor(this.time * 9 + seed) % 6;
+    var fx = TD.clamp(cx + cell * 0.62, 20 * k, C.width - 28 * k);
+    var fy = TD.clamp(cy + cell * 0.7, 24 * k, C.height - 14 * k);
+
+    if (A.has('shadow1')) {
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      A.draw(ctx, 'shadow' + (1 + seed % 6), fx - 13 * k, fy + 3 * k, 28 * k, 9 * k);
+      ctx.restore();
+    }
+    A.frame(ctx, 'fireFlame', f, 6, fx - 13 * k, fy - 15 * k, 26 * k, 26 * k);
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    A.frame(ctx, 'fireSmoke', f, 6, fx - 12 * k, fy - 44 * k, 24 * k, 38 * k);
+    ctx.restore();
+  };
+
+  /** Анимированный флаг у лагеря. */
+  Game.prototype.drawCampFlag = function (ctx, cx, cy, seed) {
+    var A = TD.Assets;
+    if (!A || !A.has('aniflag')) return;
+    var cell = this.grid.cell;
+    var k = cell / 40;
+    var w = 24 * k;
+    var h = 48 * k;
+    var fx = TD.clamp(cx + cell * 0.78, 4, C.width - w - 4);
+    var fy = TD.clamp(cy - cell * 0.18, 4, C.height - h - 4);
+    var f = Math.floor(this.time * 7 + seed * 2) % 6;
+    A.frame(ctx, 'aniflag', f, 6, fx, fy, w, h);
+  };
+
   /** Фонари вдоль дороги — оживляют поле и используют набор объектов. */
   Game.prototype.drawLamps = function (ctx) {
     var A = TD.Assets;
-    if (!A || !A.has('lamp')) return;
+    if (!A || !A.has('lamp1')) return;
     var cell = this.grid.cell;
     var k = cell / 40;
     var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    var lampNo = 0;
     for (var i = 3; i < this.pathCells.length; i += 7) {
       var p = this.pathCells[i];
       for (var d = 0; d < dirs.length; d++) {
@@ -1113,14 +1171,64 @@
         if (this.onPath(nc, nr)) continue;
         var lx = nc * cell;
         var ly = nr * cell;
+        lampNo += 1;
         this.glow(ctx, lx + cell / 2, ly + 14 * k, 20 * k, 'rgba(255,210,120,0.35)');
-        if (A.has('shadow')) {
+        if (A.has('shadow1')) {
           ctx.save();
           ctx.globalAlpha = 0.4;
-          A.draw(ctx, 'shadow', lx + 12 * k, ly + 31 * k, 18 * k, 7 * k);
+          A.draw(ctx, 'shadow' + (1 + lampNo % 6), lx + 12 * k, ly + 31 * k, 18 * k, 7 * k);
           ctx.restore();
         }
-        A.draw(ctx, 'lamp', lx + 9 * k, ly + 5 * k, 22 * k, 36 * k);
+        A.draw(ctx, 'lamp' + (1 + lampNo % 6), lx + 9 * k, ly + 5 * k, 22 * k, 36 * k);
+        break;
+      }
+    }
+  };
+
+  /** Флажки-указатели вдоль дороги. */
+  Game.prototype.drawRoadFlags = function (ctx) {
+    var A = TD.Assets;
+    if (!A || !A.has('pointer1')) return;
+    var cell = this.grid.cell;
+    var k = cell / 40;
+    var dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    var put = 0;
+    for (var i = 10; i < this.pathCells.length; i += 13) {
+      var p = this.pathCells[i];
+      for (var d = 0; d < dirs.length; d++) {
+        var nc = p.c + dirs[d][0];
+        var nr = p.r + dirs[d][1];
+        if (this.grid.at(nc, nr) !== '.') continue;
+        if (this.onPath(nc, nr)) continue;
+        if (this.isSpot(nc, nr)) continue;
+        put += 1;
+        A.draw(ctx, 'pointer' + (1 + put % 6),
+          nc * cell + cell * 0.45, nr * cell + cell * 0.18, 20 * k, 36 * k);
+        break;
+      }
+    }
+  };
+
+  /** Короткие заборы у дороги — ещё один слой декора из набора. */
+  Game.prototype.drawRoadFences = function (ctx) {
+    var A = TD.Assets;
+    if (!A || !A.has('fence1')) return;
+    var cell = this.grid.cell;
+    var k = cell / 40;
+    var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    var put = 0;
+    for (var i = 6; i < this.pathCells.length; i += 11) {
+      var p = this.pathCells[i];
+      for (var d = 0; d < dirs.length; d++) {
+        var nc = p.c + dirs[d][0];
+        var nr = p.r + dirs[d][1];
+        if (this.grid.at(nc, nr) !== '.') continue;
+        if (this.onPath(nc, nr)) continue;
+        if (this.isSpot(nc, nr)) continue;
+        if (this.towerAt(nc, nr)) continue;
+        put += 1;
+        A.draw(ctx, 'fence' + (1 + put % 10),
+          nc * cell + 6 * k, nr * cell + cell - 21 * k, 32 * k, 18 * k);
         break;
       }
     }

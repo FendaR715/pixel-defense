@@ -164,6 +164,14 @@ async function main() {
     await sleep(100);
   }
   check('ассеты free-fields загрузились', !!(assets && assets.has && assets.w === 256), JSON.stringify(assets));
+  let assetsReady = false;
+  for (let i = 0; i < 30; i++) {
+    assetsReady = await evalJS('TD.Assets && TD.Assets.ready()');
+    if (assetsReady) break;
+    await sleep(100);
+  }
+  check('все ассеты набора загружены', assetsReady === true,
+    JSON.stringify(await evalJS('TD.Assets ? {loaded: TD.Assets.loaded(), total: TD.Assets.count(), failed: Object.keys(TD.Assets.failed).length} : null')));
 
   check('меню показано', await evalJS("!document.getElementById('screen-menu').classList.contains('hidden')"));
 
