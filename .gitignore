@@ -1,0 +1,19 @@
+# зависимости
+node_modules/
+
+# системный мусор
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# временные файлы и скриншоты отладки
+*.log
+tmp/
+.tmp/
+shot*.png
+screenshots/
+
+# редакторы
+.vscode/
+.idea/
+*.swp

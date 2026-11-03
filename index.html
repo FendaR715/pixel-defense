@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Пиксельная Оборона — Tower Defense</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app" class="app">
+
+  <main class="stage">
+    <canvas id="game" width="960" height="600"></canvas>
+
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <div id="banner" class="banner hidden">
+      <div class="banner__title" id="banner-title">Волна 1</div>
+      <div class="banner__sub" id="banner-sub"></div>
+    </div>
+  </main>
+
+  <aside class="hud" id="hud">
+
+    <header class="hud__head">
+      <div class="hud__level" id="hud-level">Уровень</div>
+      <div class="hud__wave">Волна <b id="hud-wave">0</b> / <span id="hud-waves">20</span></div>
+      <div class="wavebar" title="Прогресс волны">
+        <div class="wavebar__fill" id="wavebar"></div>
+      </div>
+    </header>
+
+    <section class="stats">
+      <div class="stat stat--hp">
+        <span class="stat__ico">♥</span>
+        <span class="stat__val" id="hud-lives">20</span>
+        <span class="stat__lbl">жизни</span>
+      </div>
+      <div class="stat stat--gold">
+        <span class="stat__ico">◈</span>
+        <span class="stat__val" id="hud-gold">250</span>
+        <span class="stat__lbl">золото</span>
+      </div>
+      <div class="stat stat--score">
+        <span class="stat__ico">★</span>
+        <span class="stat__val" id="hud-score">0</span>
+        <span class="stat__lbl">очки</span>
+      </div>
+    </section>
+
+    <div class="controls">
+      <button id="btn-next" class="btn btn--accent" title="Начать следующую волну досрочно (N)">Волна ▸</button>
+      <div class="speeds" role="group" aria-label="Скорость игры">
+        <button class="btn btn--tiny is-active" data-speed="1">1×</button>
+        <button class="btn btn--tiny" data-speed="2">2×</button>
+        <button class="btn btn--tiny" data-speed="3">3×</button>
+      </div>
+      <button id="btn-pause" class="btn btn--tiny" title="Пауза (Space)">❚❚</button>
+    </div>
+
+    <h2 class="hud__title">Башни</h2>
+    <div class="shop" id="shop"></div>
+
+    <div class="inspector hidden" id="inspector">
+      <div class="inspector__head">
+        <span id="insp-title">Башня</span>
+        <button class="inspector__close" id="insp-close" title="Снять выделение (Esc)">✕</button>
+      </div>
+      <div class="inspector__rows" id="insp-rows"></div>
+      <div class="inspector__target" id="insp-target-wrap">
+        <span class="inspector__lbl">Цель:</span>
+        <button class="btn btn--tiny" id="insp-target">первая</button>
+      </div>
+      <div class="inspector__actions">
+        <button class="btn btn--accent" id="insp-upgrade">Улучшить</button>
+        <button class="btn btn--danger" id="insp-sell">Продать</button>
+      </div>
+    </div>
+
+    <footer class="hud__foot">
+      <label class="check"><input type="checkbox" id="opt-path"> <span>показывать путь (P)</span></label>
+      <label class="check"><input type="checkbox" id="opt-grid" checked> <span>сетка (G)</span></label>
+      <label class="check"><input type="checkbox" id="opt-sound" checked> <span>звук (M)</span></label>
+    </footer>
+  </aside>
+</div>
+
+<!-- ЭКРАНЫ -->
+
+<section class="screen" id="screen-menu">
+  <div class="screen__inner">
+    <h1 class="logo"><span>ПИКСЕЛЬНАЯ</span><span class="logo__accent">ОБОРОНА</span></h1>
+    <p class="tagline">Tower Defense · 3 карты · 20 волн · полностью офлайн</p>
+
+    <div class="menu">
+      <button class="btn btn--big btn--accent" data-action="play">Играть</button>
+      <button class="btn btn--big" data-action="levels">Уровни</button>
+      <button class="btn btn--big" data-action="scores">Рекорды</button>
+      <button class="btn btn--big" data-action="help">Как играть</button>
+    </div>
+
+    <p class="hint">Прогресс сохраняется автоматически в этом браузере.</p>
+  </div>
+</section>
+
+<section class="screen hidden" id="screen-levels">
+  <div class="screen__inner">
+    <h2 class="screen__title">Выбор уровня</h2>
+    <div class="cards" id="level-cards"></div>
+    <button class="btn" data-action="menu">← В меню</button>
+  </div>
+</section>
+
+<section class="screen hidden" id="screen-scores">
+  <div class="screen__inner">
+    <h2 class="screen__title">Рекорды</h2>
+    <table class="table">
+      <thead><tr><th>Уровень</th><th>Лучший результат</th><th>Волн</th><th>Статус</th></tr></thead>
+      <tbody id="scores-body"></tbody>
+    </table>
+    <div class="row">
+      <button class="btn" data-action="menu">← В меню</button>
+      <button class="btn btn--danger" id="btn-reset-scores">Сбросить рекорды</button>
+    </div>
+  </div>
+</section>
+
+<section class="screen hidden" id="screen-help">
+  <div class="screen__inner screen__inner--wide">
+    <h2 class="screen__title">Как играть</h2>
+    <div class="help">
+      <div class="help__col">
+        <h3>Цель</h3>
+        <p>Враги идут от портала к вашему сердцу. Не дайте им дойти: каждая дошедшая единица отнимает жизнь.
+           Выдержите все волны, чтобы победить.</p>
+
+        <h3>Строительство</h3>
+        <p>Выберите башню в панели справа (или клавиши <kbd>1</kbd>–<kbd>5</kbd>) и щёлкните по траве.
+           Башни занимают клетку и <b>перекрывают путь</b>, поэтому из них можно строить лабиринт.
+           Полностью замуровать проход нельзя — игра не даст.</p>
+
+        <h3>Улучшения</h3>
+        <p>Щёлкните по построенной башне: справа появятся характеристики, кнопка улучшения
+           (3 уровня) и продажи за 60% вложенного. Там же переключается выбор цели.</p>
+      </div>
+      <div class="help__col">
+        <h3>Клавиши</h3>
+        <ul class="keys">
+          <li><kbd>1</kbd>–<kbd>5</kbd> — выбор башни</li>
+          <li><kbd>ЛКМ</kbd> — построить / выделить</li>
+          <li><kbd>ПКМ</kbd> — отмена / продать под курсором</li>
+          <li><kbd>N</kbd> — следующая волна досрочно</li>
+          <li><kbd>Space</kbd> — пауза</li>
+          <li><kbd>U</kbd> — улучшить выделенную</li>
+          <li><kbd>S</kbd> — продать выделенную</li>
+          <li><kbd>P</kbd> — показать путь врагов</li>
+          <li><kbd>G</kbd> — сетка, <kbd>M</kbd> — звук</li>
+          <li><kbd>Esc</kbd> — снять выделение / пауза</li>
+        </ul>
+
+        <h3>Советы</h3>
+        <ul class="keys">
+          <li>Досрочный запуск волны даёт бонус золотом.</li>
+          <li>Пушки бьют только по земле — от летающих нужны стрелки, мороз и тесла.</li>
+          <li>Броня снижает урон; снайпер её игнорирует.</li>
+          <li>Длинный лабиринт = больше времени под огнём.</li>
+        </ul>
+      </div>
+    </div>
+    <button class="btn" data-action="menu">← В меню</button>
+  </div>
+</section>
+
+<section class="screen hidden" id="screen-result">
+  <div class="screen__inner">
+    <h2 class="screen__title" id="result-title">Победа!</h2>
+    <p class="result__sub" id="result-sub"></p>
+    <div class="result__grid" id="result-stats"></div>
+    <div class="row">
+      <button class="btn btn--accent" id="btn-retry">Заново</button>
+      <button class="btn" data-action="levels">К уровням</button>
+      <button class="btn" data-action="menu">В меню</button>
+    </div>
+  </div>
+</section>
+
+<section class="screen hidden" id="screen-pause">
+  <div class="screen__inner screen__inner--narrow">
+    <h2 class="screen__title">Пауза</h2>
+    <div class="menu">
+      <button class="btn btn--big btn--accent" id="btn-resume">Продолжить</button>
+      <button class="btn btn--big" id="btn-restart">Начать заново</button>
+      <button class="btn btn--big" data-action="levels">Выйти к уровням</button>
+    </div>
+  </div>
+</section>
+
+<script src="js/core/util.js"></script>
+<script src="js/core/sprites.js"></script>
+<script src="js/core/audio.js"></script>
+<script src="js/data/maps.js"></script>
+<script src="js/data/defs.js"></script>
+<script src="js/data/waves.js"></script>
+<script src="js/logic/grid.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
