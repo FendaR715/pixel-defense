@@ -67,8 +67,8 @@ body.has-screen {
 
 .stage {
   position: relative;
-  width: 960px;
-  height: 600px;
+  width: 1152px;
+  height: 720px;
   flex: 0 0 auto;
   border: 2px solid #6f8fb5;
   outline: 3px solid #1a2b40;
@@ -79,8 +79,8 @@ body.has-screen {
 
 #game {
   display: block;
-  width: 960px;
-  height: 600px;
+  width: 1152px;
+  height: 720px;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   cursor: crosshair;

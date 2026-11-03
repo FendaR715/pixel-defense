@@ -83,6 +83,7 @@
     this.pointer = { x: -1000, y: -1000, active: false };
     this.pathKeys = {};
     this.pathCells = [];
+    this.routeCells = this.grid.getPath();
     this.refreshPath();
     this.decor = this.buildDecor();
     this.camps = this.findCamps();
@@ -225,7 +226,9 @@
   };
 
   Game.prototype.refreshPath = function () {
-    var cells = this.grid.getPath() || [];
+    /* Маршрут фиксируется один раз за уровень. Постройка башен на площадках
+       не должна менять дорогу и перестраивать врагов. */
+    var cells = this.routeCells || this.grid.getPath() || [];
     this.pathCells = cells;
     this.pathPoints = this.grid.cellsToPoints(cells);
     this.pathKeys = {};
@@ -392,8 +395,6 @@
     this.selected = tower;
     this.hover.ok = false;
 
-    this.repathAll();
-    this.refreshPath();
     this.burst(center.x, center.y, def.color, 10);
     this.floatText(center.x, center.y - 20, '-' + def.price, '#ef476f');
     this.sound('build');
@@ -425,8 +426,6 @@
     if (i >= 0) this.towers.splice(i, 1);
     this.gold += refund;
     if (this.selected === t) this.selected = null;
-    this.repathAll();
-    this.refreshPath();
     this.burst(t.x, t.y, '#f2c14e', 8);
     this.floatText(t.x, t.y - 20, '+' + refund, '#f2c14e');
     this.sound('sell');
@@ -499,18 +498,25 @@
         e.path = this.grid.airPath();
         e.pathIndex = 1;
       }
+    } else if (x === startPixel.x && y === startPixel.y) {
+      e.path = this.pathPoints;
+      e.pathIndex = 1;
+      e.cell = this.grid.spawn;
     } else {
-      var cell = this.grid.pixelToCell(x, y);
-      if (!this.grid.walkable(cell.c, cell.r)) {
-        cell = this.grid.nearestWalkable(cell.c, cell.r) || this.grid.spawn;
+      /* осколки босса выходят на тот же зафиксированный маршрут */
+      var bestIdx = 0;
+      var bestD = Infinity;
+      for (var pi = 0; pi < this.pathPoints.length; pi++) {
+        var pp = this.pathPoints[pi];
+        var pd = TD.dist(x, y, pp.x, pp.y);
+        if (pd < bestD) {
+          bestD = pd;
+          bestIdx = pi;
+        }
       }
-      var cells = this.grid.findPath(cell, this.grid.base);
-      if (!cells) cells = [this.grid.spawn, this.grid.base];
-      var points = this.grid.cellsToPoints(cells);
-      points[0] = { x: x, y: y };
-      e.path = points;
-      e.pathIndex = points.length > 1 ? 1 : 1;
-      e.cell = cell;
+      e.path = [{ x: x, y: y }].concat(this.pathPoints.slice(bestIdx));
+      e.pathIndex = 1;
+      e.cell = this.grid.pixelToCell(x, y);
     }
 
     this.enemies.push(e);
@@ -520,28 +526,6 @@
   Game.prototype.removeEnemy = function (e) {
     var i = this.enemies.indexOf(e);
     if (i >= 0) this.enemies.splice(i, 1);
-  };
-
-  Game.prototype.repathAll = function () {
-    var base = this.grid.base;
-    for (var i = 0; i < this.enemies.length; i++) {
-      var e = this.enemies[i];
-      if (e.dead || e.flying) continue;
-      var cell = this.grid.pixelToCell(e.x, e.y);
-      if (!this.grid.walkable(cell.c, cell.r)) {
-        cell = this.grid.nearestWalkable(cell.c, cell.r) || this.grid.spawn;
-      }
-      var cells = this.grid.findPath(cell, base);
-      if (!cells) {
-        e.path = [{ x: e.x, y: e.y }, this.grid.cellCenter(base.c, base.r)];
-        e.pathIndex = 1;
-        continue;
-      }
-      var points = this.grid.cellsToPoints(cells);
-      points[0] = { x: e.x, y: e.y };
-      e.path = points;
-      e.pathIndex = points.length > 1 ? 1 : 1;
-    }
   };
 
   Game.prototype.damageEnemy = function (e, amount, opts) {
@@ -958,6 +942,7 @@
   Game.prototype.drawTerrain = function (ctx) {
     var g = this.grid;
     var cell = g.cell;
+    var k = cell / 40;
     var pal = GRASS[this.map.id] || GRASS.pass;
     var t = this.time;
     var A = TD.Assets;
@@ -986,7 +971,7 @@
         if (A && A.has('stone3')) {
           var bigStone = ['stone3', 'stone4', 'stone1'][d.deco % 3];
           A.draw(ctx, bigStone, x + 1, y + 6, cell - 2, cell - 9);
-          A.draw(ctx, 'stoneSmall', x + cell * 0.58, y + cell * 0.58, 14, 11);
+          A.draw(ctx, 'stoneSmall', x + cell * 0.58, y + cell * 0.58, 14 * k, 11 * k);
         } else {
           TD.Sprites.draw(ctx, 'rock', x, y, cell, cell);
         }
@@ -995,20 +980,20 @@
         ctx.fillRect(x, y, cell, cell);
         /* песчаный берег там, где вода граничит с землёй */
         ctx.fillStyle = '#c98a58';
-        if (g.at(d.c, d.r - 1) !== '~') ctx.fillRect(x, y, cell, 4);
-        if (g.at(d.c, d.r + 1) !== '~') ctx.fillRect(x, y + cell - 4, cell, 4);
-        if (g.at(d.c - 1, d.r) !== '~') ctx.fillRect(x, y, 4, cell);
-        if (g.at(d.c + 1, d.r) !== '~') ctx.fillRect(x + cell - 4, y, 4, cell);
-        var waveY = Math.sin(t * 1.8 + d.c * 0.7 + d.r * 0.35) * 4;
+        if (g.at(d.c, d.r - 1) !== '~') ctx.fillRect(x, y, cell, 4 * k);
+        if (g.at(d.c, d.r + 1) !== '~') ctx.fillRect(x, y + cell - 4 * k, cell, 4 * k);
+        if (g.at(d.c - 1, d.r) !== '~') ctx.fillRect(x, y, 4 * k, cell);
+        if (g.at(d.c + 1, d.r) !== '~') ctx.fillRect(x + cell - 4 * k, y, 4 * k, cell);
+        var waveY = Math.sin(t * 1.8 + d.c * 0.7 + d.r * 0.35) * 4 * k;
         ctx.fillStyle = '#3f94b4';
-        ctx.fillRect(x, y + 10 + waveY, cell, 7);
+        ctx.fillRect(x, y + 10 * k + waveY, cell, 7 * k);
         ctx.fillStyle = '#8fd8e8';
-        ctx.fillRect(x + 4, y + 24 - waveY, cell - 10, 3);
+        ctx.fillRect(x + 4 * k, y + 24 * k - waveY, cell - 10 * k, 3 * k);
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.fillRect(x + 7 + (d.flip ? 12 : 0), y + 7, 4, 2);
+        ctx.fillRect(x + 7 * k + (d.flip ? 12 * k : 0), y + 7 * k, 4 * k, 2 * k);
         if (d.dot) {
           ctx.fillStyle = '#d6f5ff';
-          ctx.fillRect(x + 26, y + 18 + waveY, 2, 2);
+          ctx.fillRect(x + 26 * k, y + 18 * k + waveY, 2 * k, 2 * k);
         }
       } else if (ch === ',') {
         if (!tiles || !A.tile(ctx, 32, x, y, cell)) {
@@ -1023,18 +1008,18 @@
         }
 
         if (A && A.has('dirt1') && d.patch) {
-          A.draw(ctx, 'dirt1', x + 12 + (d.deco % 8), y + 14 + (d.deco % 6), 17, 14);
+          A.draw(ctx, 'dirt1', x + 12 * k + (d.deco % 8), y + 14 * k + (d.deco % 6), 17 * k, 14 * k);
         }
         if (A && A.has('grass1') && d.tuft) {
-          A.draw(ctx, 'grass' + (1 + d.deco % 3), x + 8 + (d.deco % 14), y + 16, 12, 14);
+          A.draw(ctx, 'grass' + (1 + d.deco % 3), x + 8 * k + (d.deco % 14), y + 16 * k, 12 * k, 14 * k);
         } else if (d.dot) {
           ctx.fillStyle = pal.dot;
-          ctx.fillRect(x + 8 + (d.flip ? 14 : 0), y + 9, 2, 2);
-          ctx.fillRect(x + 22, y + 26, 2, 2);
+          ctx.fillRect(x + 8 * k + (d.flip ? 14 * k : 0), y + 9 * k, 2 * k, 2 * k);
+          ctx.fillRect(x + 22 * k, y + 26 * k, 2 * k, 2 * k);
         }
         if (A && A.has('flower1') && d.flower) {
           A.draw(ctx, 'flower' + (1 + d.deco % 3),
-            x + 6 + (d.deco % 20), y + 8 + ((d.deco >> 3) % 18), 12, 12);
+            x + 6 * k + (d.deco % 20), y + 8 * k + ((d.deco >> 3) % 18), 12 * k, 12 * k);
         }
       }
     }
@@ -1054,28 +1039,28 @@
         ctx.save();
         ctx.globalAlpha = 0.35;
         if (A && A.has('shadow')) {
-          A.draw(ctx, 'shadow', tx + 4, ty + 28, cell - 8, 10);
+          A.draw(ctx, 'shadow', tx + 4 * k, ty + 28 * k, cell - 8 * k, 10 * k);
         }
         ctx.restore();
         if (A && A.has('tree1')) {
           if (d.deco % 4 === 0) {
-            A.draw(ctx, 'tree2', tx + 3, ty + 4, 34, 30);
+            A.draw(ctx, 'tree2', tx + 3 * k, ty + 4 * k, 34 * k, 30 * k);
           } else {
-            A.draw(ctx, 'tree1', tx - 7, ty - 20, 54, 63);
+            A.draw(ctx, 'tree1', tx - 7 * k, ty - 20 * k, 54 * k, 63 * k);
           }
         } else {
-          TD.Sprites.draw(ctx, 'bush', tx + 3, ty + 3, cell - 6, cell - 6);
+          TD.Sprites.draw(ctx, 'bush', tx + 3 * k, ty + 3 * k, cell - 6 * k, cell - 6 * k);
         }
       } else if (d.shrub) {
         if (A && A.has('bush1')) {
-          A.draw(ctx, 'bush' + (1 + d.deco % 3), tx + 6, ty + 9, 30, 27);
+          A.draw(ctx, 'bush' + (1 + d.deco % 3), tx + 6 * k, ty + 9 * k, 30 * k, 27 * k);
         }
       } else if (d.prop) {
         if (A && A.has(d.propType)) {
           if (d.propType === 'box') {
-            A.draw(ctx, 'box', tx + 10, ty + 12, 22, 21);
+            A.draw(ctx, 'box', tx + 10 * k, ty + 12 * k, 22 * k, 21 * k);
           } else {
-            A.draw(ctx, 'log', tx + 6, ty + 18, 30, 19);
+            A.draw(ctx, 'log', tx + 6 * k, ty + 18 * k, 30 * k, 19 * k);
           }
         }
       }
@@ -1090,10 +1075,10 @@
         if (A.has('shadow')) {
           ctx.save();
           ctx.globalAlpha = 0.4;
-          A.draw(ctx, 'shadow', cx + 4, cy + 30, cell - 8, 9);
+          A.draw(ctx, 'shadow', cx + 4 * k, cy + 30 * k, cell - 8 * k, 9 * k);
           ctx.restore();
         }
-        A.draw(ctx, ci % 2 ? 'tent2' : 'tent', cx - 8, cy - 4, 56, 36);
+        A.draw(ctx, ci % 2 ? 'tent2' : 'tent', cx - 8 * k, cy - 4 * k, 56 * k, 36 * k);
       }
     }
 
@@ -1117,6 +1102,7 @@
     var A = TD.Assets;
     if (!A || !A.has('lamp')) return;
     var cell = this.grid.cell;
+    var k = cell / 40;
     var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     for (var i = 3; i < this.pathCells.length; i += 7) {
       var p = this.pathCells[i];
@@ -1127,14 +1113,14 @@
         if (this.onPath(nc, nr)) continue;
         var lx = nc * cell;
         var ly = nr * cell;
-        this.glow(ctx, lx + cell / 2, ly + 14, 20, 'rgba(255,210,120,0.35)');
+        this.glow(ctx, lx + cell / 2, ly + 14 * k, 20 * k, 'rgba(255,210,120,0.35)');
         if (A.has('shadow')) {
           ctx.save();
           ctx.globalAlpha = 0.4;
-          A.draw(ctx, 'shadow', lx + 12, ly + 31, 18, 7);
+          A.draw(ctx, 'shadow', lx + 12 * k, ly + 31 * k, 18 * k, 7 * k);
           ctx.restore();
         }
-        A.draw(ctx, 'lamp', lx + 9, ly + 5, 22, 36);
+        A.draw(ctx, 'lamp', lx + 9 * k, ly + 5 * k, 22 * k, 36 * k);
         break;
       }
     }
@@ -1144,35 +1130,36 @@
   Game.prototype.drawRoad = function (ctx, pal) {
     var pts = this.pathPoints;
     if (!pts || pts.length < 2) return;
+    var k = this.grid.cell / 40;
     ctx.save();
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
     ctx.strokeStyle = 'rgba(88,52,32,0.4)';
-    ctx.lineWidth = 38;
+    ctx.lineWidth = 38 * k;
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.stroke();
 
     ctx.strokeStyle = pal.roadEdge;
-    ctx.lineWidth = 32;
+    ctx.lineWidth = 32 * k;
     ctx.stroke();
 
     ctx.strokeStyle = pal.road;
-    ctx.lineWidth = 25;
+    ctx.lineWidth = 25 * k;
     ctx.stroke();
 
     /* камешки и выбоины на дороге */
     var cell = this.grid.cell;
-    for (var k = 0; k < this.pathCells.length; k++) {
-      var c = this.pathCells[k];
+    for (var kk = 0; kk < this.pathCells.length; kk++) {
+      var c = this.pathCells[kk];
       var n = TD.noise2(c.c, c.r, 17);
       if (n < 0.42) continue;
-      var px = c.c * cell + 8 + (n > 0.7 ? 18 : 4);
-      var py = c.r * cell + 12 + (n > 0.55 ? 14 : 4);
+      var px = c.c * cell + 8 * k + (n > 0.7 ? 18 * k : 4 * k);
+      var py = c.r * cell + 12 * k + (n > 0.55 ? 14 * k : 4 * k);
       ctx.fillStyle = n > 0.75 ? pal.roadSpeck : 'rgba(150,90,50,0.6)';
-      ctx.fillRect(px, py, 3, 2);
+      ctx.fillRect(px, py, 3 * k, 2 * k);
     }
     ctx.restore();
   };
@@ -1205,9 +1192,10 @@
 
   Game.prototype.drawPath = function (ctx) {
     if (!this.pathPoints || this.pathPoints.length < 2) return;
+    var k = this.grid.cell / 40;
     ctx.save();
     ctx.strokeStyle = 'rgba(61,220,151,0.32)';
-    ctx.lineWidth = 10;
+    ctx.lineWidth = 10 * k;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -1217,16 +1205,16 @@
     }
     ctx.stroke();
     ctx.strokeStyle = 'rgba(61,220,151,0.8)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([7, 7]);
+    ctx.lineWidth = 2 * k;
+    ctx.setLineDash([7 * k, 7 * k]);
     ctx.stroke();
     ctx.setLineDash([]);
 
     /* прямой маршрут летающих */
     var air = this.grid.airPath();
     ctx.strokeStyle = 'rgba(179,136,255,0.55)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([3, 9]);
+    ctx.lineWidth = 2 * k;
+    ctx.setLineDash([3 * k, 9 * k]);
     ctx.beginPath();
     ctx.moveTo(air[0].x, air[0].y);
     ctx.lineTo(air[1].x, air[1].y);
@@ -1239,6 +1227,7 @@
   Game.prototype.drawSpots = function (ctx) {
     var A = TD.Assets;
     var cell = this.grid.cell;
+    var k = cell / 40;
     var pad = cell + 6;
 
     for (var i = 0; i < this.spots.length; i++) {
@@ -1252,9 +1241,9 @@
       } else if (!occupied) {
         ctx.save();
         ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-        ctx.setLineDash([5, 4]);
+        ctx.setLineDash([5 * k, 4 * k]);
         ctx.beginPath();
-        ctx.arc(center.x, center.y, 15, 0, Math.PI * 2);
+        ctx.arc(center.x, center.y, 15 * k, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
       }
@@ -1266,10 +1255,10 @@
         ctx.save();
         ctx.globalAlpha = 0.55 + 0.35 * Math.sin(this.time * 4 + i);
         ctx.strokeStyle = this.buildType ? (hovered && this.hover.ok ? '#c9ffcb' : '#9af09f') : '#fff2c2';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
+        ctx.lineWidth = 2 * k;
+        ctx.setLineDash([5 * k, 5 * k]);
         ctx.beginPath();
-        ctx.arc(center.x, center.y, 17, 0, Math.PI * 2);
+        ctx.arc(center.x, center.y, 17 * k, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
       }
@@ -1278,6 +1267,7 @@
 
   Game.prototype.drawTowers = function (ctx) {
     var cell = this.grid.cell;
+    var k = cell / 40;
     var drawSize = cell + 6;
     for (var i = 0; i < this.towers.length; i++) {
       var t = this.towers[i];
@@ -1288,9 +1278,9 @@
       /* уровень: золотые пипсы */
       for (var lv = 0; lv < t.level; lv++) {
         ctx.fillStyle = '#3a2a10';
-        ctx.fillRect(t.x - 9 + lv * 7, t.y + 18, 5, 4);
+        ctx.fillRect(t.x - 9 * k + lv * 7 * k, t.y + 18 * k, 5 * k, 4 * k);
         ctx.fillStyle = '#ffc857';
-        ctx.fillRect(t.x - 8 + lv * 7, t.y + 19, 3, 2);
+        ctx.fillRect(t.x - 8 * k + lv * 7 * k, t.y + 19 * k, 3 * k, 2 * k);
       }
     }
 
@@ -1305,7 +1295,7 @@
     ctx.fill();
     ctx.strokeStyle = color || '#3ddc97';
     ctx.globalAlpha = 0.55;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.5;
     ctx.setLineDash([6, 6]);
     ctx.stroke();
     ctx.restore();
@@ -1313,18 +1303,19 @@
 
   Game.prototype.drawEnemies = function (ctx) {
     var cell = this.grid.cell;
+    var k = cell / 40;
     var list = this.enemies.slice().sort(function (a, b) { return a.y - b.y; });
     for (var i = 0; i < list.length; i++) {
       var e = list[i];
-      var size = e.boss ? 60 : 40;
-      var bob = e.flying ? Math.sin(this.time * 6 + e.phase) * 3 : 0;
+      var size = e.boss ? cell * 1.5 : cell;
+      var bob = e.flying ? Math.sin(this.time * 6 + e.phase) * 3 * k : 0;
       var y = e.y - size / 2 + bob;
 
       ctx.save();
       ctx.globalAlpha = e.flying ? 0.16 : 0.24;
       ctx.fillStyle = '#17331f';
       ctx.beginPath();
-      ctx.ellipse(e.x, e.y + 14, size * 0.36, 5, 0, 0, Math.PI * 2);
+      ctx.ellipse(e.x, e.y + 14 * k, size * 0.36, 5 * k, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
@@ -1333,7 +1324,7 @@
       ctx.globalAlpha = e.flying ? 0.4 : 0.55;
       ctx.fillStyle = e.def.color;
       ctx.beginPath();
-      ctx.ellipse(e.x, e.y + 14, size * 0.31, 3.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(e.x, e.y + 14 * k, size * 0.31, 3.2 * k, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
@@ -1352,50 +1343,52 @@
       if (e.slowUntil > this.time) {
         ctx.save();
         ctx.strokeStyle = 'rgba(155,235,255,0.9)';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2 * k;
         ctx.beginPath();
-        ctx.arc(e.x, e.y + 8, size * 0.35, 0, Math.PI * 2);
+        ctx.arc(e.x, e.y + 8 * k, size * 0.35, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
       }
 
       if (e.boss) {
         ctx.fillStyle = '#ffc857';
-        ctx.fillRect(e.x - 20, y - 8, 40, 3);
+        ctx.fillRect(e.x - 20 * k, y - 8 * k, 40 * k, 3 * k);
       }
 
       if (e.hp < e.maxHp || e.boss) {
-        var w = e.boss ? 48 : 30;
+        var w = e.boss ? 48 * k : 30 * k;
         var ratio = TD.clamp(e.hp / e.maxHp, 0, 1);
-        var by = y - (e.boss ? 14 : 9);
+        var by = y - (e.boss ? 14 : 9) * k;
         ctx.fillStyle = 'rgba(14,26,38,0.9)';
-        ctx.fillRect(e.x - w / 2 - 1, by - 1, w + 2, 6);
+        ctx.fillRect(e.x - w / 2 - 1, by - 1, w + 2, 6 * k);
         ctx.fillStyle = ratio > 0.5 ? '#6ee06f' : (ratio > 0.25 ? '#ffc857' : '#ff5f7a');
-        ctx.fillRect(e.x - w / 2, by, w * ratio, 4);
+        ctx.fillRect(e.x - w / 2, by, w * ratio, 4 * k);
       }
     }
   };
 
   Game.prototype.drawProjectiles = function (ctx) {
+    var s = this.grid.cell / 40;
     for (var i = 0; i < this.projectiles.length; i++) {
       var p = this.projectiles[i];
       for (var k = 0; k < p.trail.length; k++) {
         ctx.globalAlpha = 0.12 * (k + 1);
         ctx.fillStyle = p.color;
-        ctx.fillRect(p.trail[k].x - 1, p.trail[k].y - 1, 3, 3);
+        ctx.fillRect(p.trail[k].x - 1, p.trail[k].y - 1, 3 * s, 3 * s);
       }
       ctx.globalAlpha = 1;
       ctx.fillStyle = p.color;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 4 * s, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#fff';
-      ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+      ctx.fillRect(p.x - 1, p.y - 1, 2 * s, 2 * s);
     }
     ctx.globalAlpha = 1;
   };
 
   Game.prototype.drawEffects = function (ctx) {
+    var s = this.grid.cell / 40;
     for (var i = 0; i < this.effects.length; i++) {
       var ef = this.effects[i];
       var k = TD.clamp(ef.t / ef.dur, 0, 1);
@@ -1403,17 +1396,17 @@
         ctx.save();
         ctx.globalAlpha = 1 - k;
         ctx.strokeStyle = ef.color;
-        ctx.lineWidth = ef.width || 2;
+        ctx.lineWidth = (ef.width || 2) * s;
         ctx.shadowColor = ef.color;
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 10 * s;
         ctx.beginPath();
         if (ef.kind === 'tesla') {
           var segs = 7;
           ctx.moveTo(ef.x1, ef.y1);
-          for (var s = 1; s < segs; s++) {
-            var tt = s / segs;
-            var jx = (Math.random() * 2 - 1) * 7;
-            var jy = (Math.random() * 2 - 1) * 7;
+          for (var seg = 1; seg < segs; seg++) {
+            var tt = seg / segs;
+            var jx = (Math.random() * 2 - 1) * 7 * s;
+            var jy = (Math.random() * 2 - 1) * 7 * s;
             ctx.lineTo(ef.x1 + (ef.x2 - ef.x1) * tt + jx, ef.y1 + (ef.y2 - ef.y1) * tt + jy);
           }
           ctx.lineTo(ef.x2, ef.y2);
@@ -1427,7 +1420,7 @@
         ctx.save();
         ctx.globalAlpha = (1 - k) * 0.7;
         ctx.strokeStyle = ef.color;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 3 * s;
         ctx.beginPath();
         ctx.arc(ef.x, ef.y, Math.max(2, ef.radius * k), 0, Math.PI * 2);
         ctx.stroke();
@@ -1441,7 +1434,8 @@
         ctx.fillStyle = ef.color;
         for (var a = 0; a < 4; a++) {
           var ang = a * Math.PI / 2 + 0.4;
-          ctx.fillRect(ef.x + Math.cos(ang) * (4 + k * 8) - 1.5, ef.y + Math.sin(ang) * (4 + k * 8) - 1.5, 3, 3);
+          var rad = (4 + k * 8) * s;
+          ctx.fillRect(ef.x + Math.cos(ang) * rad - 1.5 * s, ef.y + Math.sin(ang) * rad - 1.5 * s, 3 * s, 3 * s);
         }
         ctx.restore();
       }
@@ -1459,14 +1453,15 @@
   };
 
   Game.prototype.drawFloats = function (ctx) {
+    var s = this.grid.cell / 40;
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.font = 'bold 12px Consolas, monospace';
+    ctx.font = 'bold ' + Math.round(12 * s) + 'px Consolas, monospace';
     for (var i = 0; i < this.floats.length; i++) {
       var f = this.floats[i];
       ctx.globalAlpha = TD.clamp(f.life / f.maxLife, 0, 1);
       ctx.fillStyle = '#10202f';
-      ctx.fillText(f.text, f.x + 1, f.y + 1);
+      ctx.fillText(f.text, f.x + 1.5, f.y + 1.5);
       ctx.fillStyle = f.color;
       ctx.fillText(f.text, f.x, f.y);
     }
@@ -1482,7 +1477,7 @@
     for (var i = 0; i < this.enemies.length; i++) {
       var e = this.enemies[i];
       if (e.dead) continue;
-      var size = e.boss ? 60 : 40;
+      var size = e.boss ? this.grid.cell * 1.5 : this.grid.cell;
       var d = TD.dist(this.pointer.x, this.pointer.y, e.x, e.y);
       if (d <= size * 0.55 + 3 && d < bestD) {
         best = e;
@@ -1512,12 +1507,12 @@
       if (e.flying) tags.push('летает');
       if (e.boss) tags.push('босс');
       if (tags.length) lines.push(tags.join(' · '));
-      this.drawTooltip(ctx, e.x, e.y - (e.boss ? 34 : 24), lines, e.def.color);
+      this.drawTooltip(ctx, e.x, e.y - (e.boss ? this.grid.cell * 0.9 : this.grid.cell * 0.65), lines, e.def.color);
       return;
     }
     var t = this.pointerTower();
     if (t) {
-      this.drawTooltip(ctx, t.x, t.y - 24, [
+      this.drawTooltip(ctx, t.x, t.y - 24 * (this.grid.cell / 40), [
         t.def.name + ' · ур. ' + t.level,
         'урон ' + Math.round(t.stats.damage) + ' · радиус ' + t.stats.range.toFixed(1) + ' кл.'
       ], t.def.color);
@@ -1526,7 +1521,7 @@
     var cell = this.grid.pixelToCell(this.pointer.x, this.pointer.y);
     if (this.isSpot(cell.c, cell.r) && !this.towerAt(cell.c, cell.r)) {
       var center = this.grid.cellCenter(cell.c, cell.r);
-      this.drawTooltip(ctx, center.x, center.y - 18, [
+      this.drawTooltip(ctx, center.x, center.y - 18 * (this.grid.cell / 40), [
         'Площадка под башню',
         this.buildType ? 'Кликните, чтобы построить' : 'Выберите башню в магазине'
       ], '#ffc857');
@@ -1534,30 +1529,31 @@
   };
 
   Game.prototype.drawTooltip = function (ctx, ax, ay, lines, accent) {
+    var k = this.grid.cell / 40;
     ctx.save();
-    ctx.font = 'bold 12px Consolas, "Courier New", monospace';
+    ctx.font = 'bold ' + Math.round(12 * k) + 'px Consolas, "Courier New", monospace';
     var i;
     var tw = 0;
     for (i = 0; i < lines.length; i++) {
       tw = Math.max(tw, ctx.measureText(lines[i]).width);
     }
-    var w = Math.min(C.width - 16, Math.max(104, tw + 22));
-    var lineH = 15;
-    var h = lines.length * lineH + 10;
+    var w = Math.min(C.width - 16, Math.max(104 * k, tw + 22 * k));
+    var lineH = 15 * k;
+    var h = lines.length * lineH + 10 * k;
     var x = TD.clamp(ax - w / 2, 6, C.width - w - 6);
     var y = ay - h - 6;
-    if (y < 6) y = ay + 16;
+    if (y < 6) y = ay + 16 * k;
 
     ctx.fillStyle = 'rgba(16,32,48,0.96)';
     ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = accent || '#ffc857';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 * k;
     ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     for (i = 0; i < lines.length; i++) {
       ctx.fillStyle = i === 0 ? '#ffffff' : (i === 1 ? '#dceaff' : '#a9c0da');
-      ctx.fillText(lines[i], x + 10, y + 5 + lineH * (i + 0.5));
+      ctx.fillText(lines[i], x + 10 * k, y + 5 * k + lineH * (i + 0.5));
     }
     ctx.restore();
   };
@@ -1567,6 +1563,7 @@
     var hr = this.hover.r;
     if (hc < 0 || hr < 0) return;
     var cell = this.grid.cell;
+    var k = cell / 40;
     var x = hc * cell;
     var y = hr * cell;
     var center = this.grid.cellCenter(hc, hr);
@@ -1578,21 +1575,22 @@
       ctx.fillStyle = ok ? 'rgba(61,220,151,0.18)' : 'rgba(239,71,111,0.22)';
       ctx.fillRect(x, y, cell, cell);
       ctx.strokeStyle = ok ? '#3ddc97' : '#ef476f';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2 * k;
       ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
       if (ok) {
         ctx.globalAlpha = 0.7;
-        TD.Sprites.draw(ctx, def.sprite, x, y, cell, cell);
+        var pad = cell + 6;
+        TD.Sprites.draw(ctx, def.sprite, center.x - pad / 2, center.y - pad / 2, pad, pad);
         ctx.globalAlpha = 1;
         this.drawRange(ctx, center.x, center.y, def.range * (1 + C.upgradeRange * 0) * cell, def.color);
       } else {
         ctx.strokeStyle = 'rgba(239,71,111,0.9)';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 3 * k;
         ctx.beginPath();
-        ctx.moveTo(x + 10, y + 10);
-        ctx.lineTo(x + cell - 10, y + cell - 10);
-        ctx.moveTo(x + cell - 10, y + 10);
-        ctx.lineTo(x + 10, y + cell - 10);
+        ctx.moveTo(x + 10 * k, y + 10 * k);
+        ctx.lineTo(x + cell - 10 * k, y + cell - 10 * k);
+        ctx.moveTo(x + cell - 10 * k, y + 10 * k);
+        ctx.lineTo(x + 10 * k, y + cell - 10 * k);
         ctx.stroke();
       }
       ctx.restore();

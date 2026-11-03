@@ -417,6 +417,20 @@ test('game: нельзя построить на скале и на занято
   assertEqual(g.placeTower(spot.c, spot.r, 'arrow').ok, false, 'построили поверх башни');
 });
 
+test('game: дорога не меняется после постановки и продажи башен', () => {
+  const g = new TD.Game(0);
+  const before = JSON.stringify(g.pathPoints);
+  const first = findSpot(g);
+  assert(first, 'нет площадки');
+  assert(g.placeTower(first.c, first.r, 'arrow').ok);
+  assertEqual(JSON.stringify(g.pathPoints), before, 'дорога изменилась после постройки');
+  const enemy = g.spawnEnemy('slime');
+  const route = JSON.stringify(g.pathPoints);
+  assertEqual(JSON.stringify(enemy.path), route, 'враг пошёл не по зафиксированной дороге');
+  g.sellTower(g.towers[0]);
+  assertEqual(JSON.stringify(g.pathPoints), before, 'дорога изменилась после продажи');
+});
+
 test('game: маршрут врагов корректен при башнях на площадках', () => {
   const g = new TD.Game(0);
   const enemy = g.spawnEnemy('slime');

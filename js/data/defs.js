@@ -7,9 +7,9 @@
   TD.Config = {
     cols: 24,
     rows: 15,
-    cell: 40,
-    width: 960,
-    height: 600,
+    cell: 48,
+    width: 1152,
+    height: 720,
 
     startGold: 450,
     startLives: 20,
@@ -221,4 +221,3 @@
     return byWave * byLevel;
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
-
