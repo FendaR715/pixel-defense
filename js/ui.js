@@ -900,7 +900,12 @@
         } else {
           var t = g.towerAt(cell.c, cell.r);
           g.selectTower(t);
-          if (!t) g.setHover(cell.c, cell.r);
+          if (!t) {
+            g.setHover(cell.c, cell.r);
+            if (g.isSpot(cell.c, cell.r)) {
+              toast('Площадка под башню: выберите башню (1–5)');
+            }
+          }
           updateInspector();
           if (t) TD.Audio.play('click');
         }

@@ -86,6 +86,11 @@
     this.refreshPath();
     this.decor = this.buildDecor();
     this.camps = this.findCamps();
+    this.spots = this.computeSpots(C.buildSpots);
+    this.spotKeys = {};
+    for (var si = 0; si < this.spots.length; si++) {
+      this.spotKeys[this.spots[si].c + ',' + this.spots[si].r] = true;
+    }
   }
 
   /** Уголки карты под декоративные палатки (не на маршруте). */
@@ -106,6 +111,73 @@
       out.push(p);
     }
     return out.slice(0, 2);
+  };
+
+  /**
+   * Площадки под башни: клетки у дороги, разнесённые друг от друга.
+   * Так игрок не застраивает всё поле, но у каждой башни есть зона обстрела.
+   */
+  Game.prototype.computeSpots = function (count) {
+    var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    var pathCells = this.pathCells || [];
+    var seen = {};
+    var cand = [];
+    var i, d;
+
+    for (i = 0; i < pathCells.length; i++) {
+      var p = pathCells[i];
+      for (d = 0; d < dirs.length; d++) {
+        var c = p.c + dirs[d][0];
+        var r = p.r + dirs[d][1];
+        if (!this.grid.buildable(c, r)) continue;
+        if (this.onPath(c, r)) continue;
+        var key = c + ',' + r;
+        if (seen[key]) continue;
+        seen[key] = true;
+
+        var center = this.grid.cellCenter(c, r);
+        var cover = 0;
+        for (var k = 0; k < pathCells.length; k++) {
+          var q = this.grid.cellCenter(pathCells[k].c, pathCells[k].r);
+          if (TD.dist(center.x, center.y, q.x, q.y) <= 3 * this.grid.cell) cover += 1;
+        }
+        cand.push({ c: c, r: r, cover: cover, idx: i });
+      }
+    }
+
+    cand.sort(function (a, b) {
+      return (b.cover - a.cover) || (a.idx - b.idx);
+    });
+
+    var out = [];
+    var spacing = [3, 2, 1];
+    for (var s = 0; s < spacing.length && out.length < count; s++) {
+      for (i = 0; i < cand.length && out.length < count; i++) {
+        var candSpot = cand[i];
+        var tooClose = false;
+        for (var o = 0; o < out.length; o++) {
+          var distCheb = Math.max(Math.abs(out[o].c - candSpot.c), Math.abs(out[o].r - candSpot.r));
+          if (distCheb < spacing[s]) {
+            tooClose = true;
+            break;
+          }
+        }
+        if (tooClose) continue;
+        out.push(candSpot);
+      }
+    }
+    return out.slice(0, count);
+  };
+
+  Game.prototype.isSpot = function (c, r) {
+    return !!this.spotKeys[c + ',' + r];
+  };
+
+  Game.prototype.spotAt = function (c, r) {
+    for (var i = 0; i < this.spots.length; i++) {
+      if (this.spots[i].c === c && this.spots[i].r === r) return this.spots[i];
+    }
+    return null;
   };
 
   /* ================= события и звук ================= */
@@ -265,8 +337,10 @@
     if (!inside) return;
     if (this.buildType) {
       var def = TD.TowerById[this.buildType];
-      if (!this.grid.buildable(c, r)) {
-        this.hover.reason = 'Здесь строить нельзя';
+      if (!this.isSpot(c, r)) {
+        this.hover.reason = 'Только на площадке';
+      } else if (!this.grid.buildable(c, r)) {
+        this.hover.reason = 'Площадка занята';
       } else if (this.gold < def.price) {
         this.hover.reason = 'Не хватает золота';
       } else if (!this.grid.canPlace(c, r)) {
@@ -281,7 +355,8 @@
     var def = TD.TowerById[typeId];
     if (!def) return { ok: false, reason: 'Неизвестная башня' };
     if (this.finished) return { ok: false, reason: 'Уровень окончен' };
-    if (!this.grid.buildable(c, r)) return { ok: false, reason: 'Здесь строить нельзя' };
+    if (!this.isSpot(c, r)) return { ok: false, reason: 'Только на площадке' };
+    if (!this.grid.buildable(c, r)) return { ok: false, reason: 'Площадка занята' };
     if (this.gold < def.price) return { ok: false, reason: 'Не хватает золота' };
     var center = this.grid.cellCenter(c, r);
     for (var i = 0; i < this.enemies.length; i++) {
@@ -867,6 +942,7 @@
     this.drawTerrain(ctx);
     if (this.showGrid) this.drawGrid(ctx);
     if (this.showPath) this.drawPath(ctx);
+    this.drawSpots(ctx);
     this.drawTowers(ctx);
     this.drawEnemies(ctx);
     this.drawProjectiles(ctx);
@@ -1159,36 +1235,53 @@
     ctx.restore();
   };
 
+  /** Площадки под башни: видны всегда, подсвечиваются при выборе башни. */
+  Game.prototype.drawSpots = function (ctx) {
+    var A = TD.Assets;
+    var cell = this.grid.cell;
+    var pad = cell + 6;
+
+    for (var i = 0; i < this.spots.length; i++) {
+      var s = this.spots[i];
+      var center = this.grid.cellCenter(s.c, s.r);
+      var occupied = !!this.towerAt(s.c, s.r);
+
+      if (A && A.has('towerPlace1')) {
+        A.draw(ctx, i % 2 ? 'towerPlace2' : 'towerPlace1',
+          center.x - pad / 2, center.y - pad / 2 + 2, pad, pad);
+      } else if (!occupied) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, 15, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      if (occupied) continue;
+
+      var hovered = this.hover.c === s.c && this.hover.r === s.r;
+      if (this.buildType || hovered) {
+        ctx.save();
+        ctx.globalAlpha = 0.55 + 0.35 * Math.sin(this.time * 4 + i);
+        ctx.strokeStyle = this.buildType ? (hovered && this.hover.ok ? '#c9ffcb' : '#9af09f') : '#fff2c2';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, 17, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  };
+
   Game.prototype.drawTowers = function (ctx) {
     var cell = this.grid.cell;
-    var A = TD.Assets;
     var drawSize = cell + 6;
     for (var i = 0; i < this.towers.length; i++) {
       var t = this.towers[i];
       var bounce = t.recoil * 2;
-
-      /* площадка под башней: готовая из набора, иначе процедурная */
-      ctx.save();
-      if (A && A.has('towerPlace1')) {
-        A.draw(ctx, i % 2 ? 'towerPlace2' : 'towerPlace1', t.x - drawSize / 2, t.y - drawSize / 2 + 2, drawSize, drawSize);
-      } else {
-        ctx.fillStyle = 'rgba(24,44,30,0.28)';
-        ctx.beginPath();
-        ctx.ellipse(t.x, t.y + 17, 18, 6, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#7d8799';
-        ctx.beginPath();
-        ctx.ellipse(t.x, t.y + 15, 16, 5.5, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#49536a';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        ctx.fillStyle = '#a3aec0';
-        ctx.beginPath();
-        ctx.ellipse(t.x, t.y + 13.5, 11, 3.2, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
 
       TD.Sprites.draw(ctx, t.def.sprite, t.x - drawSize / 2, t.y - drawSize / 2 - bounce, drawSize, drawSize);
 
@@ -1428,6 +1521,15 @@
         t.def.name + ' · ур. ' + t.level,
         'урон ' + Math.round(t.stats.damage) + ' · радиус ' + t.stats.range.toFixed(1) + ' кл.'
       ], t.def.color);
+      return;
+    }
+    var cell = this.grid.pixelToCell(this.pointer.x, this.pointer.y);
+    if (this.isSpot(cell.c, cell.r) && !this.towerAt(cell.c, cell.r)) {
+      var center = this.grid.cellCenter(cell.c, cell.r);
+      this.drawTooltip(ctx, center.x, center.y - 18, [
+        'Площадка под башню',
+        this.buildType ? 'Кликните, чтобы построить' : 'Выберите башню в магазине'
+      ], '#ffc857');
     }
   };
 

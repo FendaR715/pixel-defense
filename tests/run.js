@@ -268,7 +268,8 @@ test('waves: 20 волн генерируются для каждого уров
       assert(w.spawns.length > 0, 'волна ' + (i + 1) + ': нет врагов');
       assert(w.spawns.length <= 140, 'волна ' + (i + 1) + ': слишком много врагов');
       assert(w.duration <= 150, 'волна ' + (i + 1) + ': слишком долго');
-      assert(w.reward === 20 + 5 * (i + 1), 'волна ' + (i + 1) + ': награда');
+      assert(w.reward === TD.Config.waveRewardBase + TD.Config.waveRewardPerWave * (i + 1),
+        'волна ' + (i + 1) + ': награда');
       for (let s = 0; s < w.spawns.length; s++) {
         const sp = w.spawns[s];
         assert(TD.EnemyDefs[sp.type], 'волна ' + (i + 1) + ': неизвестный тип ' + sp.type);
@@ -299,17 +300,42 @@ test('waves: боссы только на 10-й и 20-й волнах', () => {
 
 /* ---------- игра ---------- */
 
-function findBuildable(game, predicate) {
+function findSpot(game, predicate) {
+  for (let i = 0; i < game.spots.length; i++) {
+    const s = game.spots[i];
+    if (game.towerAt(s.c, s.r)) continue;
+    if (predicate && !predicate(s.c, s.r)) continue;
+    return { c: s.c, r: s.r };
+  }
+  return null;
+}
+
+function findNonSpotGrass(game) {
   for (let r = 0; r < game.grid.rows; r++) {
     for (let c = 0; c < game.grid.cols; c++) {
-      if (!game.grid.buildable(c, r)) continue;
-      if (!game.grid.canPlace(c, r)) continue;
-      if (predicate && !predicate(c, r)) continue;
-      return { c, r };
+      if (game.grid.buildable(c, r) && !game.isSpot(c, r)) return { c, r };
     }
   }
   return null;
 }
+
+test('game: площадки под башни заданы и безопасны для маршрута', () => {
+  TD.Maps.forEach((map, level) => {
+    const g = new TD.Game(level);
+    assertEqual(g.spots.length, TD.Config.buildSpots, map.name + ': число площадок');
+    assert(g.spots.length >= 12, map.name + ': слишком мало площадок: ' + g.spots.length);
+    const seen = {};
+    g.spots.forEach((s) => {
+      const key = s.c + ',' + s.r;
+      assert(!seen[key], map.name + ': площадка повторяется ' + key);
+      seen[key] = true;
+      assert(g.grid.buildable(s.c, s.r), map.name + ': площадка на занятой клетке ' + key);
+      assert(!g.onPath(s.c, s.r), map.name + ': площадка стоит на дороге ' + key);
+      assert(!g.towerAt(s.c, s.r), map.name + ': площадка занята башней');
+    });
+    assert(g.grid.pathExists(), map.name + ': пропал путь');
+  });
+});
 
 test('game: стартовые ресурсы', () => {
   const g = new TD.Game(0);
@@ -323,18 +349,19 @@ test('game: стартовые ресурсы', () => {
 
 test('game: постройка, улучшение и продажа башни', () => {
   const g = new TD.Game(0);
-  const spot = findBuildable(g);
-  assert(spot, 'нет места для башни');
+  const spot = findSpot(g);
+  assert(spot, 'нет свободной площадки');
   const res = g.placeTower(spot.c, spot.r, 'arrow');
   assert(res.ok, 'башню не построили: ' + res.reason);
-  assertEqual(g.gold, 200);
+  assertEqual(g.gold, TD.Config.startGold - TD.TowerById.arrow.price);
   assertEqual(g.towers.length, 1);
   assertEqual(g.selected, res.tower);
 
+  const goldAfterBuild = g.gold;
   const up = g.upgradeTower(res.tower);
   assert(up.ok, 'улучшение не сработало: ' + up.reason);
   assertEqual(res.tower.level, 2);
-  assert(g.gold < 200, 'золото не списалось за улучшение');
+  assert(g.gold < goldAfterBuild, 'золото не списалось за улучшение');
 
   const goldBefore = g.gold;
   const sell = g.sellTower(res.tower);
@@ -343,66 +370,62 @@ test('game: постройка, улучшение и продажа башни'
   assert(g.gold > goldBefore, 'золото не вернулось');
   assertEqual(sell.refund, Math.floor(res.tower.invested * 0.6));
   assert(g.grid.walkable(spot.c, spot.r), 'клетка не освободилась');
+  assert(g.isSpot(spot.c, spot.r), 'площадка пропала после продажи');
 });
 
-test('game: золото не уходит в минус, дорогие башни не строятся', () => {
+test('game: строить можно только на площадках, золото не уходит в минус', () => {
   const g = new TD.Game(0);
+  const nonSpot = findNonSpotGrass(g);
+  assert(nonSpot, 'не нашли траву вне площадок');
+  const bad = g.placeTower(nonSpot.c, nonSpot.r, 'arrow');
+  assertEqual(bad.ok, false, 'построили башню вне площадки');
+  assertEqual(bad.reason, 'Только на площадке');
+  assertEqual(g.gold, TD.Config.startGold, 'золото списалось за неудачную постройку');
+
   g.gold = 0;
-  const spot = findBuildable(g);
-  const res = g.placeTower(spot.c, spot.r, 'sniper');
-  assertEqual(res.ok, false);
+  const spot = findSpot(g);
+  const poor = g.placeTower(spot.c, spot.r, 'sniper');
+  assertEqual(poor.ok, false);
   assertEqual(g.gold, 0, 'золото ушло в минус');
-  assertEqual(g.towers.length, 0);
 
   g.gold = 100000;
   let placed = 0;
-  for (let r = 0; r < g.grid.rows; r++) {
-    for (let c = 0; c < g.grid.cols; c++) {
-      if (g.grid.buildable(c, r) && g.grid.canPlace(c, r)) {
-        g.placeTower(c, r, 'arrow');
-        placed += 1;
-      }
-    }
-  }
-  assert(placed > 20, 'мало построено: ' + placed);
+  g.spots.forEach((s) => {
+    if (g.placeTower(s.c, s.r, 'arrow').ok) placed += 1;
+  });
+  assertEqual(placed, g.spots.length, 'не на всех площадках можно построить');
+  assertEqual(g.towers.length, g.spots.length, 'число башен не совпало с площадками');
+  const extra = g.placeTower(nonSpot.c, nonSpot.r, 'arrow');
+  assertEqual(extra.ok, false, 'построили сверх лимита площадок');
   assert(g.gold >= 0, 'золото отрицательное');
-  assert(g.grid.pathExists(), 'игрок смог замуровать путь');
+  assert(g.grid.pathExists(), 'застройка перекрыла путь');
 });
 
-test('game: нельзя построить на скале и на занятой клетке', () => {
+test('game: нельзя построить на скале и на занятой площадке', () => {
   const g = new TD.Game(0);
   let rock = null;
-  let grass = null;
   for (let r = 0; r < g.grid.rows && !rock; r++) {
     for (let c = 0; c < g.grid.cols; c++) {
       if (g.grid.at(c, r) === '#') { rock = { c, r }; break; }
     }
   }
-  for (let r = 0; r < g.grid.rows && !grass; r++) {
-    for (let c = 0; c < g.grid.cols; c++) {
-      if (g.grid.buildable(c, r) && g.grid.canPlace(c, r)) { grass = { c, r }; break; }
-    }
-  }
-  assert(rock && grass);
+  const spot = findSpot(g);
+  assert(rock && spot);
   assertEqual(g.placeTower(rock.c, rock.r, 'arrow').ok, false);
-  assert(g.placeTower(grass.c, grass.r, 'arrow').ok);
+  assert(g.placeTower(spot.c, spot.r, 'arrow').ok);
   g.gold = 1000;
-  assertEqual(g.placeTower(grass.c, grass.r, 'arrow').ok, false, 'построили поверх башни');
+  assertEqual(g.placeTower(spot.c, spot.r, 'arrow').ok, false, 'построили поверх башни');
 });
 
-test('game: после постройки маршрут врагов пересчитывается', () => {
+test('game: маршрут врагов корректен при башнях на площадках', () => {
   const g = new TD.Game(0);
   const enemy = g.spawnEnemy('slime');
   assert(enemy && enemy.path.length >= 2, 'враг без маршрута');
-  const p = g.grid.getPath();
-  let cell = null;
-  for (let i = 1; i < p.length - 1; i++) {
-    if (g.grid.canPlace(p[i].c, p[i].r)) { cell = p[i]; break; }
-  }
-  assert(cell, 'не нашли клетку для перекрытия');
-  const res = g.placeTower(cell.c, cell.r, 'arrow');
+  const spot = findSpot(g);
+  assert(spot, 'нет площадки');
+  const res = g.placeTower(spot.c, spot.r, 'arrow');
   assert(res.ok, res.reason);
-  assert(enemy.path.length >= 2, 'маршрут врага не пересчитан');
+  assert(enemy.path.length >= 2, 'маршрут врага сломан');
   const base = g.grid.cellCenter(g.grid.base.c, g.grid.base.r);
   const last = enemy.path[enemy.path.length - 1];
   assertEqual(last.x, base.x, 'маршрут не ведёт к сердцу (x)');

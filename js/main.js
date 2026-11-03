@@ -7,22 +7,11 @@
 
   function demoBuild(game) {
     game.gold = 5000;
-    var types = ['arrow', 'cannon', 'frost', 'tesla', 'sniper', 'arrow', 'cannon', 'arrow'];
-    var path = game.grid.getPath() || [];
-    var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    var placed = 0;
-    for (var i = 1; i < path.length && placed < types.length; i++) {
-      var cell = path[i];
-      for (var d = 0; d < dirs.length; d++) {
-        var c = cell.c + dirs[d][0];
-        var r = cell.r + dirs[d][1];
-        if (!game.grid.buildable(c, r) || !game.grid.canPlace(c, r)) continue;
-        var res = game.placeTower(c, r, types[placed]);
-        if (res.ok) {
-          placed += 1;
-          break;
-        }
-      }
+    var types = ['arrow', 'cannon', 'frost', 'tesla', 'sniper'];
+    for (var i = 0; i < game.spots.length; i++) {
+      var s = game.spots[i];
+      if (game.towerAt(s.c, s.r)) continue;
+      game.placeTower(s.c, s.r, types[i % types.length]);
     }
   }
 
@@ -83,6 +72,20 @@
     }
     if (game && params.get('hover') === 'tower' && game.towers[0]) {
       game.setPointer(game.towers[0].x, game.towers[0].y);
+    }
+    if (game && params.get('build')) {
+      game.setBuildType(params.get('build'));
+    }
+    if (game && params.get('hover') === 'spot') {
+      var freeSpot = null;
+      for (var si = 0; si < game.spots.length; si++) {
+        if (!game.towerAt(game.spots[si].c, game.spots[si].r)) { freeSpot = game.spots[si]; break; }
+      }
+      if (freeSpot) {
+        var sc = game.grid.cellCenter(freeSpot.c, freeSpot.r);
+        game.setPointer(sc.x, sc.y);
+        game.setHover(freeSpot.c, freeSpot.r);
+      }
     }
     if (game && params.get('result')) {
       var win = params.get('result') === 'win';

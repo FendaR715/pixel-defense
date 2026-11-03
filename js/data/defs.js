@@ -11,9 +11,12 @@
     width: 960,
     height: 600,
 
-    startGold: 250,
+    startGold: 450,
     startLives: 20,
     waveCount: 20,
+
+    /* Фиксированные площадки под башни: ограничивают спам и держат баланс. */
+    buildSpots: 15,
 
     maxTowerLevel: 3,
     upgradeDamage: 0.25,
@@ -22,12 +25,12 @@
     sellRate: 0.6,
 
     hpScalePerWave: 0.10,
-    hpScalePerLevel: 0.18,
+    hpScalePerLevel: 0.10,
 
     earlyBonusBase: 10,
     earlyBonusPerWave: 2,
-    waveRewardBase: 20,
-    waveRewardPerWave: 5,
+    waveRewardBase: 30,
+    waveRewardPerWave: 7,
 
     maxSpeed: 3,
     maxDt: 0.1
@@ -218,3 +221,4 @@
     return byWave * byLevel;
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+

@@ -181,20 +181,39 @@ async function main() {
   await sleep(400);
   check('игра началась после кнопки «Играть»', await evalJS('!!TD.UI.getGame()'));
   check('экран меню скрыт', await evalJS("document.getElementById('screen-menu').classList.contains('hidden')"));
-  check('стартовое золото 250', await evalJS('TD.UI.getGame().gold') === 250);
+  check('стартовое золото по конфигу', await evalJS('TD.UI.getGame().gold') === await evalJS('TD.Config.startGold'));
 
   /* хоткей 1 — выбор башни */
   await evalJS("document.dispatchEvent(new KeyboardEvent('keydown', {key:'1', bubbles:true}))");
   check('клавиша 1 выбрала стрелка', await evalJS('TD.UI.getGame().buildType') === 'arrow');
 
-  /* клик по пустой клетке строит башню */
-  const placed = await evalJS(`(function () {
+  /* постройка вне площадки запрещена */
+  const outside = await evalJS(`(function () {
     var g = TD.UI.getGame();
     var spot = null;
     for (var r = 0; r < g.grid.rows && !spot; r++) {
       for (var c = 0; c < g.grid.cols; c++) {
-        if (g.grid.buildable(c, r) && g.grid.canPlace(c, r)) { spot = {c:c, r:r}; break; }
+        if (g.grid.buildable(c, r) && !g.isSpot(c, r)) { spot = {c:c, r:r}; break; }
       }
+    }
+    if (!spot) return null;
+    var cv = document.getElementById('game');
+    var rect = cv.getBoundingClientRect();
+    var x = rect.left + (spot.c + 0.5) * (rect.width / g.grid.cols);
+    var y = rect.top + (spot.r + 0.5) * (rect.height / g.grid.rows);
+    cv.dispatchEvent(new MouseEvent('click', {clientX:x, clientY:y, bubbles:true}));
+    return spot;
+  })()`);
+  await sleep(150);
+  check('вне площадки башня не строится', await evalJS('TD.UI.getGame().towers.length') === 0, JSON.stringify(outside));
+
+  /* клик по свободной площадке строит башню */
+  const placed = await evalJS(`(function () {
+    var g = TD.UI.getGame();
+    var spot = null;
+    for (var i = 0; i < g.spots.length; i++) {
+      var s = g.spots[i];
+      if (!g.towerAt(s.c, s.r)) { spot = s; break; }
     }
     if (!spot) return null;
     var cv = document.getElementById('game');
@@ -203,14 +222,15 @@ async function main() {
     var y = rect.top + (spot.r + 0.5) * (rect.height / g.grid.rows);
     cv.dispatchEvent(new MouseEvent('mousemove', {clientX:x, clientY:y, bubbles:true}));
     cv.dispatchEvent(new MouseEvent('click', {clientX:x, clientY:y, bubbles:true}));
-    return spot;
+    return {c:spot.c, r:spot.r};
   })()`);
   await sleep(250);
-  check('клик по canvas построил башню', await evalJS('TD.UI.getGame().towers.length') === 1, JSON.stringify(placed));
+  check('клик по площадке построил башню', await evalJS('TD.UI.getGame().towers.length') === 1, JSON.stringify(placed));
   check('курсор мыши передаётся в игру', await evalJS('TD.UI.getGame().pointer.active') === true);
-  check('золото списалось до 200', await evalJS('TD.UI.getGame().gold') === 200);
+  check('золото списалось на цену башни', await evalJS('TD.UI.getGame().gold') === await evalJS('TD.Config.startGold - TD.TowerById.arrow.price'));
   check('инспектор показан', await evalJS("!document.getElementById('inspector').classList.contains('hidden')"));
-  check('название в инспекторе — Стрелок', (await evalJS("document.getElementById('insp-title').textContent")).indexOf('Стрелок') === 0);
+  const inspTitle = await evalJS("document.getElementById('insp-title').textContent");
+  check('название в инспекторе — Стрелок', inspTitle.indexOf('Стрелок') === 0, inspTitle);
 
   /* улучшение и продажа */
   await evalJS("document.getElementById('insp-upgrade').click()");

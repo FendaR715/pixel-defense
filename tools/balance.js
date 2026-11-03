@@ -27,23 +27,14 @@ for (const file of FILES) {
 }
 const TD = sandbox.TD;
 
-const TYPES_BY_WAVE = [
-  { wave: 0, type: 'arrow' },
-  { wave: 3, type: 'frost' },
-  { wave: 4, type: 'cannon' },
-  { wave: 6, type: 'arrow' },
-  { wave: 7, type: 'tesla' },
-  { wave: 9, type: 'sniper' },
-  { wave: 12, type: 'cannon' },
-  { wave: 14, type: 'tesla' }
+const BUILD_PLAN = [
+  'arrow', 'arrow', 'cannon', 'frost', 'arrow',
+  'tesla', 'sniper', 'cannon', 'frost', 'arrow',
+  'tesla', 'sniper', 'cannon', 'arrow'
 ];
 
-function desiredType(wave) {
-  let type = 'arrow';
-  for (const entry of TYPES_BY_WAVE) {
-    if (wave >= entry.wave) type = entry.type;
-  }
-  return type;
+function desiredType(game) {
+  return BUILD_PLAN[game.towers.length % BUILD_PLAN.length];
 }
 
 function pathCells(game) {
@@ -73,23 +64,20 @@ function bestSpot(game, def) {
   const path = pathCells(game);
   let best = null;
   let bestScore = -1;
-  for (let r = 0; r < game.grid.rows; r++) {
-    for (let c = 0; c < game.grid.cols; c++) {
-      if (!game.grid.buildable(c, r)) continue;
-      if (!game.grid.canPlace(c, r)) continue;
-      const score = spotScore(game, c, r, def, path);
-      if (score > bestScore) {
-        bestScore = score;
-        best = { c, r };
-      }
+  for (const s of game.spots) {
+    if (game.towerAt(s.c, s.r)) continue;
+    const score = spotScore(game, s.c, s.r, def, path);
+    if (score > bestScore) {
+      bestScore = score;
+      best = { c: s.c, r: s.r };
     }
   }
   return best;
 }
 
 function tryBuild(game) {
-  if (game.towers.length >= 22) return false;
-  const type = desiredType(game.wave);
+  if (game.towers.length >= game.spots.length) return false;
+  const type = desiredType(game);
   const def = TD.TowerById[type];
   if (game.gold < def.price) return false;
   const spot = bestSpot(game, def);

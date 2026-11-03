@@ -11,9 +11,9 @@
 ## Проверки
 
 ```bash
-node tests/run.js          # 30 юнит-тестов логики и ассетов
+node tests/run.js          # 31 юнит-тест логики, ассетов и площадок
 node tools/balance.js      # симуляция баланса: все 3 карты проходятся
-node tools/ui-check.js     # 29 проверок интерфейса в headless-браузере
+node tools/ui-check.js     # 30 проверок интерфейса в headless-браузере
 ```
 
 ## Что осталось сделать
