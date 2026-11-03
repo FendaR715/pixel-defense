@@ -125,39 +125,46 @@
     slime: {
       id: 'slime', name: 'Слизень', sprite: 'enemy_slime',
       hp: 40, speed: 1.1, armor: 0, gold: 4, points: 10, lives: 1,
-      color: '#3ddc97'
+      color: '#8ee04f',
+      desc: 'Базовый враг: медленный, но идёт толпой.'
     },
     runner: {
       id: 'runner', name: 'Бегун', sprite: 'enemy_runner',
       hp: 25, speed: 2.2, armor: 0, gold: 5, points: 12, lives: 1,
-      color: '#ef476f'
+      color: '#ff6b5e',
+      desc: 'Быстрый и хрупкий — проскакивает мимо башен.'
     },
     swarm: {
       id: 'swarm', name: 'Роевик', sprite: 'enemy_swarm',
       hp: 15, speed: 1.6, armor: 0, gold: 2, points: 5, lives: 1,
-      color: '#9d4edd'
+      color: '#a94cff',
+      desc: 'Мелкие и дешёвые, атакуют роем.'
     },
     brute: {
       id: 'brute', name: 'Громила', sprite: 'enemy_brute',
       hp: 160, speed: 0.8, armor: 2, gold: 12, points: 30, lives: 1,
-      color: '#a86a32'
+      color: '#e09a5a',
+      desc: 'Танк: много здоровья и брони, но медленный.'
     },
     shield: {
       id: 'shield', name: 'Щитоносец', sprite: 'enemy_shield',
       hp: 120, speed: 0.9, armor: 6, gold: 14, points: 35, lives: 1,
-      color: '#4cc9f0'
+      color: '#72b8ff',
+      desc: 'Стальной щит: высокая броня. Снайпер её игнорирует.'
     },
     flyer: {
       id: 'flyer', name: 'Летун', sprite: 'enemy_flyer',
       hp: 60, speed: 1.4, armor: 0, gold: 8, points: 20, lives: 1,
       flying: true,
-      color: '#b388ff'
+      color: '#7fe3ff',
+      desc: 'Летит по прямой к сердцу, игнорируя лабиринт.'
     },
     boss: {
       id: 'boss', name: 'Владыка', sprite: 'enemy_boss',
       hp: 1500, speed: 0.6, armor: 5, gold: 120, points: 400, lives: 5,
       boss: true,
-      color: '#ef476f'
+      color: '#ff5f74',
+      desc: 'Владыка: огромный запас HP. При смерти делится на трёх громил.'
     }
   };
 

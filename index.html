@@ -96,6 +96,7 @@
     <div class="menu">
       <button class="btn btn--big btn--accent" data-action="play">Играть</button>
       <button class="btn btn--big" data-action="levels">Уровни</button>
+      <button class="btn btn--big" data-action="bestiary">Бестиарий</button>
       <button class="btn btn--big" data-action="scores">Рекорды</button>
       <button class="btn btn--big" data-action="help">Как играть</button>
     </div>
@@ -108,6 +109,20 @@
   <div class="screen__inner screen__inner--wide">
     <h2 class="screen__title">Выбор уровня</h2>
     <div class="cards" id="level-cards"></div>
+    <button class="btn" data-action="menu">← В меню</button>
+  </div>
+</section>
+
+<section class="screen hidden" id="screen-bestiary">
+  <div class="screen__inner screen__inner--wide">
+    <h2 class="screen__title">Бестиарий</h2>
+    <div class="bestiary">
+      <h3 class="bestiary__group">Башни</h3>
+      <div class="bestiary__grid" id="bestiary-towers"></div>
+      <h3 class="bestiary__group">Враги</h3>
+      <div class="bestiary__grid" id="bestiary-enemies"></div>
+    </div>
+    <p class="hint">Наведите курсор на врага или башню в бою — появится подсказка с названием.</p>
     <button class="btn" data-action="menu">← В меню</button>
   </div>
 </section>
@@ -143,6 +158,10 @@
         <h3>Улучшения</h3>
         <p>Щёлкните по построенной башне: справа появятся характеристики, кнопка улучшения
            (3 уровня) и продажи за 60% вложенного. Там же переключается выбор цели.</p>
+
+        <h3>Подсказки</h3>
+        <p>Наведите курсор на врага или башню — появится название и характеристики.
+           Все типы врагов и башен собраны в «Бестиарии».</p>
       </div>
       <div class="help__col">
         <h3>Клавиши</h3>
@@ -198,6 +217,7 @@
 
 <script src="js/core/util.js"></script>
 <script src="js/core/sprites.js"></script>
+<script src="js/core/assets.js"></script>
 <script src="js/core/audio.js"></script>
 <script src="js/data/maps.js"></script>
 <script src="js/data/defs.js"></script>

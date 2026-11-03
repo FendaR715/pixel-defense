@@ -23,8 +23,8 @@
 
     tower_arrow: {
       palette: pal({
-        A: '#3ddc97', a: '#1f8a5f', w: '#7a4a21', W: '#a86a32',
-        s: '#3b4759', S: '#5d6f88'
+        A: '#f26b4d', a: '#b3402c', w: '#8a5527', W: '#cf9250',
+        s: '#4f5c70', S: '#93a6bf'
       }),
       rows: [
         '................',
@@ -48,8 +48,8 @@
 
     tower_cannon: {
       palette: pal({
-        C: '#9aa6b8', M: '#5b6678', m: '#38414f', A: '#f2c14e',
-        s: '#3b4759', S: '#5d6f88'
+        C: '#c3cfdf', M: '#7c8ba1', m: '#46546a', A: '#ffc857',
+        s: '#4f5c70', S: '#93a6bf'
       }),
       rows: [
         '................',
@@ -73,8 +73,8 @@
 
     tower_frost: {
       palette: pal({
-        F: '#8fe3ff', f: '#4cc9f0', w: '#e6fbff',
-        s: '#3b4759', S: '#5d6f88'
+        F: '#c2f4ff', f: '#63d9ff', w: '#ffffff',
+        s: '#4f5c70', S: '#93a6bf'
       }),
       rows: [
         '................',
@@ -98,8 +98,8 @@
 
     tower_tesla: {
       palette: pal({
-        T: '#4cc9f0', t: '#a9f0ff', A: '#f2c14e',
-        s: '#3b4759', S: '#5d6f88'
+        T: '#7fe8ff', t: '#e8fdff', A: '#ffc857',
+        s: '#4f5c70', S: '#93a6bf'
       }),
       rows: [
         '....t......t....',
@@ -123,8 +123,8 @@
 
     tower_sniper: {
       palette: pal({
-        G: '#3ddc97', g: '#1f8a5f', N: '#4b5565', n: '#2f3846',
-        s: '#3b4759', S: '#5d6f88'
+        G: '#ffd166', g: '#c99a2e', N: '#3f6b52', n: '#294a38',
+        s: '#4f5c70', S: '#93a6bf'
       }),
       rows: [
         '..........oo....',
@@ -150,7 +150,7 @@
 
     enemy_slime: {
       palette: pal({
-        d: '#1f8a5f', G: '#3ddc97', g: '#2ea043', w: '#eafff5'
+        d: '#24502a', G: '#a6ef5c', g: '#79cf3f', w: '#ffffff'
       }),
       rows: [
         '................',
@@ -174,7 +174,7 @@
 
     enemy_runner: {
       palette: pal({
-        R: '#ef476f', r: '#a01f3c', w: '#ffe3e8'
+        R: '#ff6b5e', r: '#c93c3c', w: '#fff1a8'
       }),
       rows: [
         '................',
@@ -198,7 +198,7 @@
 
     enemy_swarm: {
       palette: pal({
-        p: '#9d4edd', P: '#c77dff', w: '#f3e8ff'
+        p: '#a94cff', P: '#e0a8ff', w: '#ffffff'
       }),
       rows: [
         '................',
@@ -222,7 +222,7 @@
 
     enemy_brute: {
       palette: pal({
-        b: '#7a4a21', B: '#a86a32', m: '#5b6678', w: '#ffe3b3'
+        b: '#9c5a2e', B: '#e09a5a', m: '#9aa7ba', w: '#ffe28a'
       }),
       rows: [
         '................',
@@ -246,7 +246,7 @@
 
     enemy_shield: {
       palette: pal({
-        S: '#4cc9f0', s: '#1f7a9e', e: '#0b2a3a', g: '#f2c14e'
+        S: '#72b8ff', s: '#2f6fa8', e: '#12324a', g: '#ffd166'
       }),
       rows: [
         '................',
@@ -270,7 +270,7 @@
 
     enemy_flyer: {
       palette: pal({
-        F: '#b388ff', f: '#7c4dff', w: '#ffe3e8'
+        F: '#7fe3ff', f: '#2a9cc4', w: '#ff6b81'
       }),
       rows: [
         '................',
@@ -294,7 +294,7 @@
 
     enemy_boss: {
       palette: pal({
-        A: '#a01f3c', a: '#ef476f', g: '#f2c14e', e: '#ffe3e8'
+        A: '#c22f4e', a: '#ff5f74', g: '#ffd166', e: '#fff0f3'
       }),
       rows: [
         '..o..........o..',
@@ -320,7 +320,7 @@
 
     portal: {
       palette: pal({
-        P: '#9d4edd', p: '#4b1a80', o: '#2a0b4a'
+        P: '#b36bff', p: '#6a2fb0', o: '#3a1366'
       }),
       rows: [
         '................',
@@ -344,7 +344,7 @@
 
     heart: {
       palette: pal({
-        R: '#ef476f', r: '#a01f3c', w: '#ffd6de'
+        R: '#ff4d6d', r: '#c9184a', w: '#ffd6de'
       }),
       rows: [
         '................',
@@ -368,47 +368,47 @@
 
     rock: {
       palette: pal({
-        s: '#39465a', S: '#5b6f8c'
+        s: '#6b7384', S: '#b3bdcb', d: '#556072'
       }),
       rows: [
-        '................',
-        '................',
-        '................',
-        '....oooooo......',
-        '...osSSSSso.....',
-        '..osSSSSSSso....',
-        '.osSSSSSSSSso...',
-        '.osSSSSSSSSso...',
-        '.osSSSSSSSso....',
-        '.osSSSSSSso.....',
-        '..osSSSSso......',
-        '...oooooo.......',
-        '................',
-        '................',
-        '................',
+        'oooooooooooooooo',
+        'oSSSSSSSSSSSSSSo',
+        'oSSdSSSSSSdSSSSo',
+        'oSSSSSSSSSSSSSSo',
+        'oSSSSSdSSSSSSSSo',
+        'oSSSSSSSSSSSdSSo',
+        'oSSSSSSSSSSSSSSo',
+        'oSSdSSSSSSSSSSSo',
+        'oSSSSSSSSSdSSSSo',
+        'oSSSSSSSSSSSSSSo',
+        'oSSSSSdSSSSSSSSo',
+        'oSSSSSSSSSSSdSSo',
+        'oSSdSSSSSSSSSSSo',
+        'oSssSSSSSSssSSSo',
+        'oooooooooooooooo',
         '................'
       ]
     },
 
     bush: {
       palette: pal({
-        G: '#2c5a3c', g: '#22482f', d: '#183524'
+        G: '#5cbf4f', g: '#3e8f38', W: '#8a5527'
       }),
       rows: [
         '................',
         '................',
-        '................',
-        '................',
-        '......ooo.......',
-        '....ooGGGoo.....',
-        '...oGGGGGGGo....',
-        '..oGGGGGGGGGo...',
-        '..oGGGGGGGGGo...',
-        '...oGGGGGGGo....',
-        '....oGGGGGo.....',
-        '.....ooooo......',
-        '................',
-        '................',
+        '......oooo......',
+        '.....oGGGGo.....',
+        '....oGGGGGGo....',
+        '...oGGgGGgGGo...',
+        '...oGGGGGGGGo...',
+        '...oGgGGGGgGo...',
+        '....oGGGGGGo....',
+        '.....oGGGGo.....',
+        '......oWWo......',
+        '......oWWo......',
+        '......oWWo......',
+        '.....oooooo.....',
         '................',
         '................'
       ]

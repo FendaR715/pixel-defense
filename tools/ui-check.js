@@ -150,8 +150,31 @@ async function main() {
     } catch (e) { /* страница ещё грузится */ }
   }
   check('страница загрузилась, TD.UI на месте', ready);
+  let assets = null;
+  for (let i = 0; i < 20; i++) {
+    assets = await evalJS(`(function () {
+      var img = TD.Assets && TD.Assets.get('fields');
+      return {
+        has: !!img,
+        w: img ? img.naturalWidth : 0,
+        loaded: TD.Assets ? TD.Assets.loaded() : 0
+      };
+    })()`);
+    if (assets && assets.has) break;
+    await sleep(100);
+  }
+  check('ассеты free-fields загрузились', !!(assets && assets.has && assets.w === 256), JSON.stringify(assets));
 
   check('меню показано', await evalJS("!document.getElementById('screen-menu').classList.contains('hidden')"));
+
+  /* бестиарий */
+  await evalJS("document.querySelector('[data-action=\"bestiary\"]').click()");
+  await sleep(200);
+  check('бестиарий открывается', await evalJS("!document.getElementById('screen-bestiary').classList.contains('hidden')"));
+  check('в бестиарии 5 башен', (await evalJS("document.querySelectorAll('#bestiary-towers .beast').length")) === 5);
+  check('в бестиарии 7 врагов', (await evalJS("document.querySelectorAll('#bestiary-enemies .beast').length")) === 7);
+  await evalJS("document.querySelector('#screen-bestiary [data-action=\"menu\"]').click()");
+  await sleep(150);
 
   /* старт игры через меню */
   await evalJS("document.querySelector('[data-action=\"play\"]').click()");
@@ -184,6 +207,7 @@ async function main() {
   })()`);
   await sleep(250);
   check('клик по canvas построил башню', await evalJS('TD.UI.getGame().towers.length') === 1, JSON.stringify(placed));
+  check('курсор мыши передаётся в игру', await evalJS('TD.UI.getGame().pointer.active') === true);
   check('золото списалось до 200', await evalJS('TD.UI.getGame().gold') === 200);
   check('инспектор показан', await evalJS("!document.getElementById('inspector').classList.contains('hidden')"));
   check('название в инспекторе — Стрелок', (await evalJS("document.getElementById('insp-title').textContent")).indexOf('Стрелок') === 0);

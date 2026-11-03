@@ -41,6 +41,7 @@
       if (screen && TD.UI.showScreen) {
         var screens = {
           levels: 'screen-levels',
+          bestiary: 'screen-bestiary',
           scores: 'screen-scores',
           help: 'screen-help',
           menu: 'screen-menu',
@@ -76,6 +77,12 @@
     var ff = parseInt(params.get('ff') || '0', 10);
     if (game && ff > 0) {
       for (var i = 0; i < ff; i++) game.step(1 / 30);
+    }
+    if (game && params.get('hover') === 'enemy' && game.enemies[0]) {
+      game.setPointer(game.enemies[0].x, game.enemies[0].y);
+    }
+    if (game && params.get('hover') === 'tower' && game.towers[0]) {
+      game.setPointer(game.towers[0].x, game.towers[0].y);
     }
     if (game && params.get('result')) {
       var win = params.get('result') === 'win';

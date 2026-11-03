@@ -13,10 +13,24 @@
     { id: 'near', name: 'ближняя', hint: 'ближе всего к башне' }
   ];
 
+  /* Палитра под набор free-fields: оливковая трава, тёплая земля.
+     Если картинки не загрузились, поля рисуются этими цветами. */
   var GRASS = {
-    pass: { a: '#1a2c21', b: '#16261c', dot: '#24402c', edge: '#0f1b14' },
-    canyon: { a: '#2a241d', b: '#241f19', dot: '#3a2f23', edge: '#181410' },
-    swamp: { a: '#192a27', b: '#152421', dot: '#21403a', edge: '#0e1b19' }
+    pass: {
+      a: '#a4ae4e', b: '#9ea849', dot: '#c4cc6d', edge: '#6e7734',
+      road: '#e79a63', roadEdge: '#a95d3c', roadSpeck: '#f4c695',
+      flower: '#fff3b0', flower2: '#ffd166', rock: '#8a8f7a'
+    },
+    canyon: {
+      a: '#a9a34f', b: '#a29c4a', dot: '#c9c273', edge: '#716c34',
+      road: '#e39a60', roadEdge: '#a45c38', roadSpeck: '#f0c28d',
+      flower: '#ffd166', flower2: '#ef8354', rock: '#a98a63'
+    },
+    swamp: {
+      a: '#8cae62', b: '#86a75d', dot: '#b7cf85', edge: '#5a733c',
+      road: '#d9a06c', roadEdge: '#9c633c', roadSpeck: '#ecc493',
+      flower: '#c9f0ff', flower2: '#ffd166', rock: '#84908a'
+    }
   };
 
   function Game(levelIndex) {
@@ -66,9 +80,33 @@
 
     this.onEvent = function () {};
 
-    this.pathPoints = this.grid.cellsToPoints(this.grid.getPath());
+    this.pointer = { x: -1000, y: -1000, active: false };
+    this.pathKeys = {};
+    this.pathCells = [];
+    this.refreshPath();
     this.decor = this.buildDecor();
+    this.camps = this.findCamps();
   }
+
+  /** Уголки карты под декоративные палатки (не на маршруте). */
+  Game.prototype.findCamps = function () {
+    var corners = [
+      { c: 0, r: this.grid.rows - 1 },
+      { c: this.grid.cols - 1, r: 0 },
+      { c: 0, r: 0 },
+      { c: this.grid.cols - 1, r: this.grid.rows - 1 }
+    ];
+    var out = [];
+    for (var i = 0; i < corners.length; i++) {
+      var p = corners[i];
+      if (!this.grid.buildable(p.c, p.r)) continue;
+      if (this.onPath(p.c, p.r)) continue;
+      if (this.grid.spawn.c === p.c && this.grid.spawn.r === p.r) continue;
+      if (this.grid.base.c === p.c && this.grid.base.r === p.r) continue;
+      out.push(p);
+    }
+    return out.slice(0, 2);
+  };
 
   /* ================= события и звук ================= */
 
@@ -93,11 +131,21 @@
       for (var c = 0; c < this.grid.cols; c++) {
         var ch = this.grid.at(c, r);
         var n = TD.noise2(c, r, seed);
+        var n2 = TD.noise2(c + 13, r + 7, seed);
+        var n3 = TD.noise2(c + 41, r + 23, seed);
         out.push({
           c: c, r: r, ch: ch,
-          dot: n > 0.55,
-          bush: (ch === '.' || ch === ',') && n > 0.978,
-          flip: n > 0.5
+          dot: n > 0.45,
+          bush: (ch === '.' || ch === ',') && n > 0.975,
+          shrub: ch === '.' && n2 > 0.84 && n2 < 0.89,
+          flower: ch === '.' && n2 > 0.9,
+          flowerWarm: n > 0.5,
+          tuft: (ch === '.' || ch === ',') && n > 0.46 && n < 0.6,
+          patch: ch === '.' && n2 > 0.8 && n2 < 0.84,
+          prop: ch === '.' && n3 > 0.94,
+          propType: (n3 > 0.97 ? 'box' : 'log'),
+          flip: n > 0.5,
+          deco: TD.hash('deco:' + c + ':' + r + ':' + this.levelIndex)
         });
       }
     }
@@ -105,8 +153,28 @@
   };
 
   Game.prototype.refreshPath = function () {
-    var cells = this.grid.getPath();
+    var cells = this.grid.getPath() || [];
+    this.pathCells = cells;
     this.pathPoints = this.grid.cellsToPoints(cells);
+    this.pathKeys = {};
+    for (var i = 0; i < cells.length; i++) {
+      this.pathKeys[cells[i].c + ',' + cells[i].r] = true;
+    }
+  };
+
+  Game.prototype.onPath = function (c, r) {
+    return !!this.pathKeys[c + ',' + r];
+  };
+
+  /** Курсор в координатах поля — для подсказок при наведении. */
+  Game.prototype.setPointer = function (x, y) {
+    this.pointer.x = x;
+    this.pointer.y = y;
+    this.pointer.active = true;
+  };
+
+  Game.prototype.clearPointer = function () {
+    this.pointer.active = false;
   };
 
   /* ================= волны ================= */
@@ -806,6 +874,7 @@
     this.drawParticles(ctx);
     this.drawPurchase(ctx);
     this.drawFloats(ctx);
+    this.drawTooltips(ctx);
 
     ctx.restore();
   };
@@ -815,64 +884,221 @@
     var cell = g.cell;
     var pal = GRASS[this.map.id] || GRASS.pass;
     var t = this.time;
+    var A = TD.Assets;
+    var tiles = !!(A && A.has('fields'));
     var i, d;
+
+    ctx.imageSmoothingEnabled = false;
 
     for (i = 0; i < this.decor.length; i++) {
       d = this.decor[i];
       var x = d.c * cell;
       var y = d.r * cell;
       var ch = d.ch;
+
       if (ch === '#') {
-        ctx.fillStyle = pal.edge;
-        ctx.fillRect(x, y, cell, cell);
+        /* трава + камни из набора */
+        if (!tiles || !A.tile(ctx, 37, x, y, cell)) {
+          ctx.fillStyle = pal.edge;
+          ctx.fillRect(x, y, cell, cell);
+        }
+        /* тёмная каменистая подложка, чтобы стена читалась как препятствие */
+        ctx.save();
+        ctx.globalAlpha = 0.42;
         TD.Sprites.draw(ctx, 'rock', x, y, cell, cell);
+        ctx.restore();
+        if (A && A.has('stone3')) {
+          var bigStone = ['stone3', 'stone4', 'stone1'][d.deco % 3];
+          A.draw(ctx, bigStone, x + 1, y + 6, cell - 2, cell - 9);
+          A.draw(ctx, 'stoneSmall', x + cell * 0.58, y + cell * 0.58, 14, 11);
+        } else {
+          TD.Sprites.draw(ctx, 'rock', x, y, cell, cell);
+        }
       } else if (ch === '~') {
-        ctx.fillStyle = '#0e2b3a';
+        ctx.fillStyle = '#4aa6c4';
         ctx.fillRect(x, y, cell, cell);
-        var waveY = Math.sin(t * 1.6 + d.c * 0.7 + d.r * 0.35) * 5;
-        ctx.fillStyle = '#16465b';
-        ctx.fillRect(x + 3, y + 12 + waveY, cell - 8, 3);
-        ctx.fillStyle = '#1e5b74';
-        ctx.fillRect(x + 12, y + 26 - waveY, cell - 18, 2);
+        /* песчаный берег там, где вода граничит с землёй */
+        ctx.fillStyle = '#c98a58';
+        if (g.at(d.c, d.r - 1) !== '~') ctx.fillRect(x, y, cell, 4);
+        if (g.at(d.c, d.r + 1) !== '~') ctx.fillRect(x, y + cell - 4, cell, 4);
+        if (g.at(d.c - 1, d.r) !== '~') ctx.fillRect(x, y, 4, cell);
+        if (g.at(d.c + 1, d.r) !== '~') ctx.fillRect(x + cell - 4, y, 4, cell);
+        var waveY = Math.sin(t * 1.8 + d.c * 0.7 + d.r * 0.35) * 4;
+        ctx.fillStyle = '#3f94b4';
+        ctx.fillRect(x, y + 10 + waveY, cell, 7);
+        ctx.fillStyle = '#8fd8e8';
+        ctx.fillRect(x + 4, y + 24 - waveY, cell - 10, 3);
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.fillRect(x + 7 + (d.flip ? 12 : 0), y + 7, 4, 2);
         if (d.dot) {
-          ctx.fillStyle = '#2a7590';
-          ctx.fillRect(x + 6 + (d.flip ? 8 : 0), y + 6, 2, 2);
+          ctx.fillStyle = '#d6f5ff';
+          ctx.fillRect(x + 26, y + 18 + waveY, 2, 2);
         }
       } else if (ch === ',') {
-        ctx.fillStyle = (d.c + d.r) % 2 ? '#2b241b' : '#262017';
-        ctx.fillRect(x, y, cell, cell);
-        if (d.dot) {
-          ctx.fillStyle = '#3a3024';
-          ctx.fillRect(x + 10 + (d.flip ? 12 : 0), y + 14, 3, 2);
+        if (!tiles || !A.tile(ctx, 32, x, y, cell)) {
+          ctx.fillStyle = (d.c + d.r) % 2 ? '#c2a267' : '#b99a61';
+          ctx.fillRect(x, y, cell, cell);
         }
       } else {
-        ctx.fillStyle = (d.c + d.r) % 2 ? pal.a : pal.b;
-        ctx.fillRect(x, y, cell, cell);
-        if (d.dot) {
+        /* трава */
+        if (!tiles || !A.tile(ctx, 37, x, y, cell)) {
+          ctx.fillStyle = (d.c + d.r) % 2 ? pal.a : pal.b;
+          ctx.fillRect(x, y, cell, cell);
+        }
+
+        if (A && A.has('dirt1') && d.patch) {
+          A.draw(ctx, 'dirt1', x + 12 + (d.deco % 8), y + 14 + (d.deco % 6), 17, 14);
+        }
+        if (A && A.has('grass1') && d.tuft) {
+          A.draw(ctx, 'grass' + (1 + d.deco % 3), x + 8 + (d.deco % 14), y + 16, 12, 14);
+        } else if (d.dot) {
           ctx.fillStyle = pal.dot;
           ctx.fillRect(x + 8 + (d.flip ? 14 : 0), y + 9, 2, 2);
-          ctx.fillRect(x + 22, y + 24, 2, 2);
+          ctx.fillRect(x + 22, y + 26, 2, 2);
         }
-        if (d.bush) {
-          ctx.save();
-          ctx.globalAlpha = 0.55;
-          TD.Sprites.draw(ctx, 'bush', x + 12, y + 12, cell - 24, cell - 24);
-          ctx.restore();
+        if (A && A.has('flower1') && d.flower) {
+          A.draw(ctx, 'flower' + (1 + d.deco % 3),
+            x + 6 + (d.deco % 20), y + 8 + ((d.deco >> 3) % 18), 12, 12);
         }
       }
     }
 
+    this.drawRoad(ctx, pal);
+
+    /* деревья и кусты — поверх дороги, но только вне маршрута */
+    for (i = 0; i < this.decor.length; i++) {
+      d = this.decor[i];
+      if (d.ch === '#' || d.ch === '~') continue;
+      if (this.onPath(d.c, d.r)) continue;
+
+      var tx = d.c * cell;
+      var ty = d.r * cell;
+
+      if (d.bush) {
+        ctx.save();
+        ctx.globalAlpha = 0.35;
+        if (A && A.has('shadow')) {
+          A.draw(ctx, 'shadow', tx + 4, ty + 28, cell - 8, 10);
+        }
+        ctx.restore();
+        if (A && A.has('tree1')) {
+          if (d.deco % 4 === 0) {
+            A.draw(ctx, 'tree2', tx + 3, ty + 4, 34, 30);
+          } else {
+            A.draw(ctx, 'tree1', tx - 7, ty - 20, 54, 63);
+          }
+        } else {
+          TD.Sprites.draw(ctx, 'bush', tx + 3, ty + 3, cell - 6, cell - 6);
+        }
+      } else if (d.shrub) {
+        if (A && A.has('bush1')) {
+          A.draw(ctx, 'bush' + (1 + d.deco % 3), tx + 6, ty + 9, 30, 27);
+        }
+      } else if (d.prop) {
+        if (A && A.has(d.propType)) {
+          if (d.propType === 'box') {
+            A.draw(ctx, 'box', tx + 10, ty + 12, 22, 21);
+          } else {
+            A.draw(ctx, 'log', tx + 6, ty + 18, 30, 19);
+          }
+        }
+      }
+    }
+
+    /* палатки в уголках карты */
+    if (A && A.has('tent')) {
+      for (var ci = 0; ci < this.camps.length; ci++) {
+        var camp = this.camps[ci];
+        var cx = camp.c * cell;
+        var cy = camp.r * cell;
+        if (A.has('shadow')) {
+          ctx.save();
+          ctx.globalAlpha = 0.4;
+          A.draw(ctx, 'shadow', cx + 4, cy + 30, cell - 8, 9);
+          ctx.restore();
+        }
+        A.draw(ctx, ci % 2 ? 'tent2' : 'tent', cx - 8, cy - 4, 56, 36);
+      }
+    }
+
+    this.drawLamps(ctx);
+
     /* портал */
     var sp = g.cellCenter(g.spawn.c, g.spawn.r);
     var pulse = 0.5 + Math.sin(t * 3) * 0.5;
-    this.glow(ctx, sp.x, sp.y, 34 + pulse * 8, 'rgba(157,78,221,0.35)');
+    this.glow(ctx, sp.x, sp.y, 40 + pulse * 8, 'rgba(186,110,255,0.5)');
     TD.Sprites.draw(ctx, 'portal', sp.x - cell / 2, sp.y - cell / 2, cell, cell);
 
     /* сердце */
     var bp = g.cellCenter(g.base.c, g.base.r);
     var hpPulse = 0.5 + Math.sin(t * 4) * 0.5;
-    this.glow(ctx, bp.x, bp.y, 30 + hpPulse * 8, this.lives <= 5 ? 'rgba(239,71,111,0.5)' : 'rgba(239,71,111,0.28)');
+    this.glow(ctx, bp.x, bp.y, 36 + hpPulse * 8, this.lives <= 5 ? 'rgba(255,90,120,0.7)' : 'rgba(255,90,120,0.45)');
     TD.Sprites.draw(ctx, 'heart', bp.x - cell / 2, bp.y - cell / 2, cell, cell);
+  };
+
+  /** Фонари вдоль дороги — оживляют поле и используют набор объектов. */
+  Game.prototype.drawLamps = function (ctx) {
+    var A = TD.Assets;
+    if (!A || !A.has('lamp')) return;
+    var cell = this.grid.cell;
+    var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (var i = 3; i < this.pathCells.length; i += 7) {
+      var p = this.pathCells[i];
+      for (var d = 0; d < dirs.length; d++) {
+        var nc = p.c + dirs[d][0];
+        var nr = p.r + dirs[d][1];
+        if (this.grid.at(nc, nr) !== '.') continue;
+        if (this.onPath(nc, nr)) continue;
+        var lx = nc * cell;
+        var ly = nr * cell;
+        this.glow(ctx, lx + cell / 2, ly + 14, 20, 'rgba(255,210,120,0.35)');
+        if (A.has('shadow')) {
+          ctx.save();
+          ctx.globalAlpha = 0.4;
+          A.draw(ctx, 'shadow', lx + 12, ly + 31, 18, 7);
+          ctx.restore();
+        }
+        A.draw(ctx, 'lamp', lx + 9, ly + 5, 22, 36);
+        break;
+      }
+    }
+  };
+
+  /** Дорога по текущему маршруту — в цветах земли из набора. */
+  Game.prototype.drawRoad = function (ctx, pal) {
+    var pts = this.pathPoints;
+    if (!pts || pts.length < 2) return;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    ctx.strokeStyle = 'rgba(88,52,32,0.4)';
+    ctx.lineWidth = 38;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+
+    ctx.strokeStyle = pal.roadEdge;
+    ctx.lineWidth = 32;
+    ctx.stroke();
+
+    ctx.strokeStyle = pal.road;
+    ctx.lineWidth = 25;
+    ctx.stroke();
+
+    /* камешки и выбоины на дороге */
+    var cell = this.grid.cell;
+    for (var k = 0; k < this.pathCells.length; k++) {
+      var c = this.pathCells[k];
+      var n = TD.noise2(c.c, c.r, 17);
+      if (n < 0.42) continue;
+      var px = c.c * cell + 8 + (n > 0.7 ? 18 : 4);
+      var py = c.r * cell + 12 + (n > 0.55 ? 14 : 4);
+      ctx.fillStyle = n > 0.75 ? pal.roadSpeck : 'rgba(150,90,50,0.6)';
+      ctx.fillRect(px, py, 3, 2);
+    }
+    ctx.restore();
   };
 
   Game.prototype.glow = function (ctx, x, y, radius, color) {
@@ -886,7 +1112,7 @@
   Game.prototype.drawGrid = function (ctx) {
     var cell = this.grid.cell;
     ctx.save();
-    ctx.strokeStyle = 'rgba(219,228,240,0.05)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.075)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (var c = 0; c <= this.grid.cols; c++) {
@@ -935,26 +1161,43 @@
 
   Game.prototype.drawTowers = function (ctx) {
     var cell = this.grid.cell;
+    var A = TD.Assets;
+    var drawSize = cell + 6;
     for (var i = 0; i < this.towers.length; i++) {
       var t = this.towers[i];
       var bounce = t.recoil * 2;
 
+      /* площадка под башней: готовая из набора, иначе процедурная */
       ctx.save();
-      ctx.globalAlpha = 0.25;
-      ctx.fillStyle = '#000';
-      ctx.beginPath();
-      ctx.ellipse(t.x, t.y + 15, 15, 5, 0, 0, Math.PI * 2);
-      ctx.fill();
+      if (A && A.has('towerPlace1')) {
+        A.draw(ctx, i % 2 ? 'towerPlace2' : 'towerPlace1', t.x - drawSize / 2, t.y - drawSize / 2 + 2, drawSize, drawSize);
+      } else {
+        ctx.fillStyle = 'rgba(24,44,30,0.28)';
+        ctx.beginPath();
+        ctx.ellipse(t.x, t.y + 17, 18, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#7d8799';
+        ctx.beginPath();
+        ctx.ellipse(t.x, t.y + 15, 16, 5.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#49536a';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = '#a3aec0';
+        ctx.beginPath();
+        ctx.ellipse(t.x, t.y + 13.5, 11, 3.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
 
-      TD.Sprites.draw(ctx, t.def.sprite, t.x - cell / 2, t.y - cell / 2 - bounce, cell, cell);
+      TD.Sprites.draw(ctx, t.def.sprite, t.x - drawSize / 2, t.y - drawSize / 2 - bounce, drawSize, drawSize);
 
       /* уровень: золотые пипсы */
       for (var lv = 0; lv < t.level; lv++) {
-        ctx.fillStyle = '#f2c14e';
-        ctx.fillRect(t.x - 8 + lv * 7, t.y + 15, 4, 3);
-        ctx.fillStyle = '#0b0e14';
-        ctx.fillRect(t.x - 8 + lv * 7, t.y + 18, 4, 1);
+        ctx.fillStyle = '#3a2a10';
+        ctx.fillRect(t.x - 9 + lv * 7, t.y + 18, 5, 4);
+        ctx.fillStyle = '#ffc857';
+        ctx.fillRect(t.x - 8 + lv * 7, t.y + 19, 3, 2);
       }
     }
 
@@ -980,15 +1223,24 @@
     var list = this.enemies.slice().sort(function (a, b) { return a.y - b.y; });
     for (var i = 0; i < list.length; i++) {
       var e = list[i];
-      var size = e.boss ? 54 : 34;
+      var size = e.boss ? 60 : 40;
       var bob = e.flying ? Math.sin(this.time * 6 + e.phase) * 3 : 0;
       var y = e.y - size / 2 + bob;
 
       ctx.save();
-      ctx.globalAlpha = e.flying ? 0.18 : 0.3;
-      ctx.fillStyle = '#000';
+      ctx.globalAlpha = e.flying ? 0.16 : 0.24;
+      ctx.fillStyle = '#17331f';
       ctx.beginPath();
-      ctx.ellipse(e.x, e.y + 13, size * 0.36, 5, 0, 0, Math.PI * 2);
+      ctx.ellipse(e.x, e.y + 14, size * 0.36, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      /* цветное кольцо под врагом — подсказывает тип */
+      ctx.save();
+      ctx.globalAlpha = e.flying ? 0.4 : 0.55;
+      ctx.fillStyle = e.def.color;
+      ctx.beginPath();
+      ctx.ellipse(e.x, e.y + 14, size * 0.31, 3.2, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
@@ -1006,7 +1258,7 @@
 
       if (e.slowUntil > this.time) {
         ctx.save();
-        ctx.strokeStyle = 'rgba(76,201,240,0.75)';
+        ctx.strokeStyle = 'rgba(155,235,255,0.9)';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(e.x, e.y + 8, size * 0.35, 0, Math.PI * 2);
@@ -1015,17 +1267,17 @@
       }
 
       if (e.boss) {
-        ctx.fillStyle = '#f2c14e';
+        ctx.fillStyle = '#ffc857';
         ctx.fillRect(e.x - 20, y - 8, 40, 3);
       }
 
       if (e.hp < e.maxHp || e.boss) {
-        var w = e.boss ? 46 : 28;
+        var w = e.boss ? 48 : 30;
         var ratio = TD.clamp(e.hp / e.maxHp, 0, 1);
         var by = y - (e.boss ? 14 : 9);
-        ctx.fillStyle = 'rgba(11,14,20,0.85)';
+        ctx.fillStyle = 'rgba(14,26,38,0.9)';
         ctx.fillRect(e.x - w / 2 - 1, by - 1, w + 2, 6);
-        ctx.fillStyle = ratio > 0.5 ? '#3ddc97' : (ratio > 0.25 ? '#f2c14e' : '#ef476f');
+        ctx.fillStyle = ratio > 0.5 ? '#6ee06f' : (ratio > 0.25 ? '#ffc857' : '#ff5f7a');
         ctx.fillRect(e.x - w / 2, by, w * ratio, 4);
       }
     }
@@ -1120,10 +1372,90 @@
     for (var i = 0; i < this.floats.length; i++) {
       var f = this.floats[i];
       ctx.globalAlpha = TD.clamp(f.life / f.maxLife, 0, 1);
-      ctx.fillStyle = '#0b0e14';
+      ctx.fillStyle = '#10202f';
       ctx.fillText(f.text, f.x + 1, f.y + 1);
       ctx.fillStyle = f.color;
       ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.restore();
+  };
+
+  /* ================= подсказки при наведении ================= */
+
+  Game.prototype.pointerEnemy = function () {
+    if (!this.pointer.active) return null;
+    var best = null;
+    var bestD = Infinity;
+    for (var i = 0; i < this.enemies.length; i++) {
+      var e = this.enemies[i];
+      if (e.dead) continue;
+      var size = e.boss ? 60 : 40;
+      var d = TD.dist(this.pointer.x, this.pointer.y, e.x, e.y);
+      if (d <= size * 0.55 + 3 && d < bestD) {
+        best = e;
+        bestD = d;
+      }
+    }
+    return best;
+  };
+
+  Game.prototype.pointerTower = function () {
+    if (!this.pointer.active) return null;
+    for (var i = 0; i < this.towers.length; i++) {
+      var t = this.towers[i];
+      if (TD.dist(this.pointer.x, this.pointer.y, t.x, t.y) < 22) return t;
+    }
+    return null;
+  };
+
+  Game.prototype.drawTooltips = function (ctx) {
+    if (!this.pointer.active) return;
+    var e = this.pointerEnemy();
+    if (e) {
+      var lines = [e.def.name];
+      lines.push('HP ' + Math.ceil(e.hp) + ' / ' + Math.ceil(e.maxHp));
+      var tags = [];
+      if (e.def.armor) tags.push('броня ' + e.def.armor);
+      if (e.flying) tags.push('летает');
+      if (e.boss) tags.push('босс');
+      if (tags.length) lines.push(tags.join(' · '));
+      this.drawTooltip(ctx, e.x, e.y - (e.boss ? 34 : 24), lines, e.def.color);
+      return;
+    }
+    var t = this.pointerTower();
+    if (t) {
+      this.drawTooltip(ctx, t.x, t.y - 24, [
+        t.def.name + ' · ур. ' + t.level,
+        'урон ' + Math.round(t.stats.damage) + ' · радиус ' + t.stats.range.toFixed(1) + ' кл.'
+      ], t.def.color);
+    }
+  };
+
+  Game.prototype.drawTooltip = function (ctx, ax, ay, lines, accent) {
+    ctx.save();
+    ctx.font = 'bold 12px Consolas, "Courier New", monospace';
+    var i;
+    var tw = 0;
+    for (i = 0; i < lines.length; i++) {
+      tw = Math.max(tw, ctx.measureText(lines[i]).width);
+    }
+    var w = Math.min(C.width - 16, Math.max(104, tw + 22));
+    var lineH = 15;
+    var h = lines.length * lineH + 10;
+    var x = TD.clamp(ax - w / 2, 6, C.width - w - 6);
+    var y = ay - h - 6;
+    if (y < 6) y = ay + 16;
+
+    ctx.fillStyle = 'rgba(16,32,48,0.96)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = accent || '#ffc857';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    for (i = 0; i < lines.length; i++) {
+      ctx.fillStyle = i === 0 ? '#ffffff' : (i === 1 ? '#dceaff' : '#a9c0da');
+      ctx.fillText(lines[i], x + 10, y + 5 + lineH * (i + 0.5));
     }
     ctx.restore();
   };

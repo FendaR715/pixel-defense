@@ -171,6 +171,8 @@
       els.optGrid = $('opt-grid');
       els.optSound = $('opt-sound');
       els.levelCards = $('level-cards');
+      els.bestiaryTowers = $('bestiary-towers');
+      els.bestiaryEnemies = $('bestiary-enemies');
       els.scoresBody = $('scores-body');
       els.btnReset = $('btn-reset-scores');
       els.resultTitle = $('result-title');
@@ -182,6 +184,7 @@
       els.screens = {
         'screen-menu': $('screen-menu'),
         'screen-levels': $('screen-levels'),
+        'screen-bestiary': $('screen-bestiary'),
         'screen-scores': $('screen-scores'),
         'screen-help': $('screen-help'),
         'screen-result': $('screen-result'),
@@ -577,16 +580,16 @@
       var cell = 8;
       c.imageSmoothingEnabled = false;
       var colors = {
-        '.': '#22382a', ',': '#3a3024', '#': '#4a5a70', '~': '#1a4a61',
-        'S': '#9d4edd', 'B': '#ef476f'
+        '.': '#a4ae4e', ',': '#e79a63', '#': '#8a8f7a', '~': '#4aa6c4',
+        'S': '#9d4edd', 'B': '#ff4d6d'
       };
       for (var r = 0; r < map.ascii.length; r++) {
         for (var col = 0; col < map.ascii[r].length; col++) {
           var ch = map.ascii[r].charAt(col);
-          c.fillStyle = colors[ch] || '#22382a';
+          c.fillStyle = colors[ch] || '#a4ae4e';
           c.fillRect(col * cell, r * cell, cell, cell);
           if (ch === '.') {
-            c.fillStyle = '#1b2d21';
+            c.fillStyle = '#bcc56a';
             c.fillRect(col * cell + 2, r * cell + 5, 2, 2);
           }
         }
@@ -664,6 +667,89 @@
         });
         els.levelCards.appendChild(card);
       });
+    }
+
+    function makeBeastCard(def, kind) {
+      var card = document.createElement('div');
+      card.className = 'beast';
+
+      var iconWrap = document.createElement('div');
+      iconWrap.className = 'beast__icon';
+      var icon = TD.Sprites.icon(def.sprite, 52);
+      if (icon) {
+        icon.style.width = '52px';
+        icon.style.height = '52px';
+        iconWrap.appendChild(icon);
+      }
+
+      var body = document.createElement('div');
+      body.className = 'beast__body';
+
+      var name = document.createElement('h4');
+      name.className = 'beast__name';
+      name.textContent = def.name;
+
+      if (kind === 'tower' && def.hotkey) {
+        var key = document.createElement('kbd');
+        key.className = 'beast__key';
+        key.textContent = def.hotkey;
+        name.appendChild(key);
+      }
+
+      var stats = document.createElement('div');
+      stats.className = 'beast__stats';
+      if (kind === 'tower') {
+        stats.textContent = def.price + ' ◈ · урон ' + def.damage + ' · радиус ' +
+          def.range + ' · ' + def.rate + '/с';
+      } else {
+        stats.textContent = 'HP ' + def.hp + ' · скорость ' + def.speed +
+          ' · броня ' + def.armor + ' · ' + def.gold + ' ◈';
+      }
+
+      var desc = document.createElement('p');
+      desc.className = 'beast__desc';
+      desc.textContent = def.desc || '';
+
+      body.appendChild(name);
+      body.appendChild(stats);
+      body.appendChild(desc);
+      card.appendChild(iconWrap);
+      card.appendChild(body);
+
+      var tags = [];
+      if (kind === 'tower') {
+        if (!def.air) tags.push('только по земле');
+      } else {
+        if (def.flying) tags.push('летает');
+        if (def.boss) tags.push('босс');
+        if (def.armor >= 6) tags.push('высокая броня');
+      }
+      if (tags.length) {
+        var tag = document.createElement('span');
+        tag.className = 'beast__tag';
+        tag.textContent = tags.join(' · ');
+        body.appendChild(tag);
+      }
+
+      return card;
+    }
+
+    function renderBestiary() {
+      var i;
+      if (els.bestiaryTowers) {
+        els.bestiaryTowers.innerHTML = '';
+        for (i = 0; i < TD.TowerDefs.length; i++) {
+          els.bestiaryTowers.appendChild(makeBeastCard(TD.TowerDefs[i], 'tower'));
+        }
+      }
+      if (els.bestiaryEnemies) {
+        els.bestiaryEnemies.innerHTML = '';
+        var ids = ['slime', 'runner', 'swarm', 'brute', 'shield', 'flyer', 'boss'];
+        for (i = 0; i < ids.length; i++) {
+          var def = TD.EnemyDefs[ids[i]];
+          if (def) els.bestiaryEnemies.appendChild(makeBeastCard(def, 'enemy'));
+        }
+      }
     }
 
     function renderScores() {
@@ -759,15 +845,22 @@
 
     /* ---------- ввод ---------- */
 
-    function eventCell(e) {
+    function eventPoint(e) {
       var canvas = els.canvas;
       var rect = canvas.getBoundingClientRect();
       var x = (e.clientX - rect.left) * canvas.width / rect.width;
       var y = (e.clientY - rect.top) * canvas.height / rect.height;
       return {
+        x: x,
+        y: y,
         c: Math.floor(x / TD.Config.cell),
         r: Math.floor(y / TD.Config.cell)
       };
+    }
+
+    function eventCell(e) {
+      var p = eventPoint(e);
+      return { c: p.c, r: p.r };
     }
 
     function bindEvents() {
@@ -776,14 +869,18 @@
       canvas.addEventListener('mousemove', function (e) {
         var g = state.game;
         if (!g) return;
-        var cell = eventCell(e);
-        if (cell.c !== g.hover.c || cell.r !== g.hover.r) {
-          g.setHover(cell.c, cell.r);
+        var p = eventPoint(e);
+        g.setPointer(p.x, p.y);
+        if (p.c !== g.hover.c || p.r !== g.hover.r) {
+          g.setHover(p.c, p.r);
         }
       });
 
       canvas.addEventListener('mouseleave', function () {
-        if (state.game) state.game.setHover(-1, -1);
+        if (state.game) {
+          state.game.setHover(-1, -1);
+          state.game.clearPointer();
+        }
       });
 
       canvas.addEventListener('click', function (e) {
@@ -899,6 +996,9 @@
           state.game = null;
           renderLevelCards();
           showScreen('screen-levels');
+        } else if (action === 'bestiary') {
+          renderBestiary();
+          showScreen('screen-bestiary');
         } else if (action === 'scores') {
           renderScores();
           showScreen('screen-scores');
@@ -1031,6 +1131,7 @@
       buildShop();
       bindEvents();
       renderLevelCards();
+      renderBestiary();
       renderScores();
       showScreen('screen-menu');
       fitLayout();

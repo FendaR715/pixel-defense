@@ -11,6 +11,7 @@ const ROOT = path.join(__dirname, '..');
 const FILES = [
   'js/core/util.js',
   'js/core/sprites.js',
+  'js/core/assets.js',
   'js/core/audio.js',
   'js/data/maps.js',
   'js/data/defs.js',
@@ -98,6 +99,26 @@ test('sprites: все описания 16×16 и с полной палитро�
   assertEqual(issues.length, 0, 'битые спрайты:\n' + issues.join('\n'));
   const names = Object.keys(TD.Sprites.defs);
   assert(names.length >= 16, 'ожидалось минимум 16 спрайтов, есть ' + names.length);
+});
+
+test('assets: набор free-fields на месте, PNG читаются', () => {
+  const base = path.join(ROOT, 'free-fields-tileset-pixel-art-for-tower-defense');
+  const files = TD.Assets.FILES;
+  const names = Object.keys(files);
+  assert(names.length >= 20, 'слишком мало ассетов: ' + names.length);
+  names.forEach((name) => {
+    const p = path.join(base, files[name]);
+    assert(fs.existsSync(p), 'нет файла ' + files[name]);
+    const buf = fs.readFileSync(p);
+    assertEqual(buf.slice(1, 4).toString('latin1'), 'PNG', name + ': не PNG');
+    const w = buf.readUInt32BE(16);
+    const h = buf.readUInt32BE(20);
+    assert(w > 0 && h > 0, name + ': пустое изображение');
+  });
+  const tileset = path.join(base, TD.Assets.FILES.fields);
+  const tbuf = fs.readFileSync(tileset);
+  assertEqual(tbuf.readUInt32BE(16), 256, 'тайлсет: ширина');
+  assertEqual(tbuf.readUInt32BE(20), 256, 'тайлсет: высота');
 });
 
 /* ---------- карты и путь ---------- */
