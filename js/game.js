@@ -674,7 +674,7 @@
     t.shots += 1;
     t.attackAnim = 0.5;
     t.angle = Math.atan2(target.y - t.y, target.x - t.x);
-    var muzzleY = t.y - C.cell * 0.55;
+    var muzzleY = t.y - C.cell * 1.25;
 
     if (def.attack === 'projectile' || def.attack === 'splash' || def.attack === 'slow') {
       this.projectiles.push({
@@ -711,7 +711,7 @@
     var dmg = t.stats.damage;
     this.damageEnemy(target, dmg, {});
     this.addEffect({
-      type: 'beam', x1: t.x, y1: t.y - C.cell * 0.55, x2: target.x, y2: target.y,
+      type: 'beam', x1: t.x, y1: t.y - C.cell * 1.25, x2: target.x, y2: target.y,
       color: def.color, dur: 0.14, width: 2, kind: 'tesla'
     });
     var last = target;
@@ -1001,7 +1001,6 @@
           ctx.fillStyle = pal.edge;
           ctx.fillRect(x, y, cell, cell);
         }
-        /* тёмная каменистая подложка, чтобы стена читалась как препятствие */
         /* мягкая тень под валунами вместо растянутой каменной плитки */
         if (A && A.has('shadow1')) {
           ctx.save();
@@ -1009,23 +1008,20 @@
           A.draw(ctx, 'shadow' + (1 + d.deco % 6), x + cell * 0.12, y + cell * 0.68, cell * 0.76, cell * 0.16);
           ctx.restore();
         }
-        if (A && A.has('stone3')) {
+        if (A && A.has('stone9')) {
+          /* целочисленный масштаб 2×: камни не «плывут» и сохраняют детали */
           var bigStones = ['stone3', 'stone9', 'stone11', 'stone13', 'stone15'];
           var stoneKey = bigStones[d.deco % bigStones.length];
           var info = A.size(stoneKey);
-          var bw = cell * 0.95;
-          var bh = info ? bw * (info.h / info.w) : cell * 0.7;
-          if (bh > cell * 0.95) {
-            bh = cell * 0.95;
-            bw = info ? bh * (info.w / info.h) : cell * 0.95;
-          }
+          var bw = info ? info.w * 2 : cell * 0.7;
+          var bh = info ? info.h * 2 : cell * 0.5;
           A.draw(ctx, stoneKey, x + (cell - bw) / 2, y + cell - bh - 2 * k, bw, bh);
 
           var smallStones = ['stone2', 'stone5', 'stone6', 'stone10', 'stone14'];
           var smallKey = smallStones[d.deco % smallStones.length];
           var smallInfo = A.size(smallKey);
-          var sw = 14 * k;
-          var sh = smallInfo ? sw * (smallInfo.h / smallInfo.w) : 11 * k;
+          var sw = smallInfo ? smallInfo.w * 2 : 22;
+          var sh = smallInfo ? smallInfo.h * 2 : 16;
           A.draw(ctx, smallKey, x + cell * 0.58, y + cell * 0.58, sw, sh);
         } else {
           TD.Sprites.draw(ctx, 'rock', x, y, cell, cell);
@@ -1073,15 +1069,19 @@
           ctx.fillRect(x + 22 * k, y + 26 * k, 2 * k, 2 * k);
         }
         if (A && A.has('flower1') && d.flower) {
-          A.draw(ctx, 'flower' + (1 + d.deco % 12),
-            x + 6 * k + (d.deco % 20), y + 8 * k + ((d.deco >> 3) % 18), 12 * k, 12 * k);
+          var fk = 'flower' + (1 + d.deco % 12);
+          var fi = A.size(fk);
+          var fw = fi ? fi.w * 3 : 18;
+          var fh = fi ? fi.h * 3 : 18;
+          A.draw(ctx, fk,
+            x + 6 * k + (d.deco % 20), y + 8 * k + ((d.deco >> 3) % 18), fw, fh);
         }
         if (A && A.has('stone1') && d.pebble) {
           var pebbles = ['stone1', 'stone2', 'stone5', 'stone6', 'stone10', 'stone14'];
           var pk = pebbles[d.deco % pebbles.length];
           var pi = A.size(pk);
-          var pw = 12 * k;
-          var ph = pi ? pw * (pi.h / pi.w) : 10 * k;
+          var pw = pi ? pi.w * 2 : 22;
+          var ph = pi ? pi.h * 2 : 16;
           A.draw(ctx, pk, x + 8 * k + (d.deco % 16), y + 22 * k + (d.deco % 8), pw, ph);
         }
       }
@@ -1107,23 +1107,33 @@
         ctx.restore();
         if (A && A.has('tree1')) {
           if (d.deco % 4 === 0) {
-            A.draw(ctx, 'tree2', tx + 3 * k, ty + 4 * k, 34 * k, 30 * k);
+            var t2 = A.size('tree2');
+            A.draw(ctx, 'tree2', tx + 3 * k, ty + 4 * k, t2 ? t2.w : 29, t2 ? t2.h : 26);
           } else {
-            A.draw(ctx, 'tree1', tx - 7 * k, ty - 20 * k, 54 * k, 63 * k);
+            var t1 = A.size('tree1');
+            var tw1 = t1 ? t1.w : 66;
+            var th1 = t1 ? t1.h : 77;
+            A.draw(ctx, 'tree1', tx + (cell - tw1) / 2, ty + cell - th1 + 6 * k, tw1, th1);
           }
         } else {
           TD.Sprites.draw(ctx, 'bush', tx + 3 * k, ty + 3 * k, cell - 6 * k, cell - 6 * k);
         }
       } else if (d.shrub) {
         if (A && A.has('bush1')) {
-          A.draw(ctx, 'bush' + (1 + d.deco % 6), tx + 6 * k, ty + 9 * k, 30 * k, 27 * k);
+          var bk = 'bush' + (1 + d.deco % 6);
+          var bi = A.size(bk);
+          A.draw(ctx, bk, tx + 4 * k, ty + 7 * k, bi ? bi.w * 2 : 52, bi ? bi.h * 2 : 46);
         }
       } else if (d.prop) {
         if (A && A.has('log1')) {
           if (d.propType === 'box') {
-            A.draw(ctx, 'box' + (1 + d.deco % 4), tx + 10 * k, ty + 12 * k, 22 * k, 21 * k);
+            var bx = 'box' + (1 + d.deco % 4);
+            var bxi = A.size(bx);
+            A.draw(ctx, bx, tx + 10 * k, ty + 12 * k, bxi ? bxi.w * 2 : 34, bxi ? bxi.h * 2 : 32);
           } else {
-            A.draw(ctx, 'log' + (1 + d.deco % 4), tx + 6 * k, ty + 18 * k, 30 * k, 19 * k);
+            var lg = 'log' + (1 + d.deco % 4);
+            var lgi = A.size(lg);
+            A.draw(ctx, lg, tx + 6 * k, ty + 18 * k, lgi ? lgi.w : 34, lgi ? lgi.h : 21);
           }
         }
       }
@@ -1141,7 +1151,9 @@
           A.draw(ctx, 'shadow' + (1 + ci % 6), cx + 4 * k, cy + 30 * k, cell - 8 * k, 9 * k);
           ctx.restore();
         }
-        A.draw(ctx, 'tent' + (1 + (ci * 2 + this.levelIndex) % 6), cx - 8 * k, cy - 4 * k, 56 * k, 36 * k);
+        var tentKey = 'tent' + (1 + (ci * 2 + this.levelIndex) % 6);
+        var tentInfo = A.size(tentKey);
+        A.draw(ctx, tentKey, cx - 8 * k, cy - 4 * k, tentInfo ? tentInfo.w : 57, tentInfo ? tentInfo.h : 36);
         this.drawCampfire(ctx, cx, cy, ci);
         this.drawCampFlag(ctx, cx, cy, ci);
       }
@@ -1177,13 +1189,13 @@
     if (A.has('shadow1')) {
       ctx.save();
       ctx.globalAlpha = 0.4;
-      A.draw(ctx, 'shadow' + (1 + seed % 6), fx - 13 * k, fy + 3 * k, 28 * k, 9 * k);
+      A.draw(ctx, 'shadow' + (1 + seed % 6), fx - 14, fy + 2, 28, 9);
       ctx.restore();
     }
-    A.frame(ctx, 'fireFlame', f, 6, fx - 13 * k, fy - 15 * k, 26 * k, 26 * k);
+    A.frame(ctx, 'fireFlame', f, 6, fx - 16, fy - 31, 32, 32);
     ctx.save();
     ctx.globalAlpha = 0.6;
-    A.frame(ctx, 'fireSmoke', f, 6, fx - 12 * k, fy - 44 * k, 24 * k, 38 * k);
+    A.frame(ctx, 'fireSmoke', f, 6, fx - 16, fy - 78, 32, 64);
     ctx.restore();
   };
 
@@ -1193,8 +1205,8 @@
     if (!A || !A.has('aniflag')) return;
     var cell = this.grid.cell;
     var k = cell / 40;
-    var w = 24 * k;
-    var h = 48 * k;
+    var w = 32;
+    var h = 64;
     var fx = TD.clamp(cx + cell * 0.78, 4, C.width - w - 4);
     var fy = TD.clamp(cy - cell * 0.18, 4, C.height - h - 4);
     var f = Math.floor(this.time * 7 + seed * 2) % 6;
@@ -1219,14 +1231,16 @@
         var lx = nc * cell;
         var ly = nr * cell;
         lampNo += 1;
-        this.glow(ctx, lx + cell / 2, ly + 14 * k, 20 * k, 'rgba(255,210,120,0.35)');
+        this.glow(ctx, lx + cell / 2, ly + 14 * k, 24 * k, 'rgba(255,210,120,0.35)');
         if (A.has('shadow1')) {
           ctx.save();
           ctx.globalAlpha = 0.4;
-          A.draw(ctx, 'shadow' + (1 + lampNo % 6), lx + 12 * k, ly + 31 * k, 18 * k, 7 * k);
+          A.draw(ctx, 'shadow' + (1 + lampNo % 6), lx + 12, ly + 40, 30, 9);
           ctx.restore();
         }
-        A.draw(ctx, 'lamp' + (1 + lampNo % 6), lx + 9 * k, ly + 5 * k, 22 * k, 36 * k);
+        var lampKey = 'lamp' + (1 + lampNo % 6);
+        var lampInfo = A.size(lampKey);
+        A.draw(ctx, lampKey, lx + 8, ly - 8, lampInfo ? lampInfo.w * 2 : 40, lampInfo ? lampInfo.h * 2 : 70);
         break;
       }
     }
@@ -1249,8 +1263,11 @@
         if (this.onPath(nc, nr)) continue;
         if (this.isSpot(nc, nr)) continue;
         put += 1;
-        A.draw(ctx, 'pointer' + (1 + put % 6),
-          nc * cell + cell * 0.45, nr * cell + cell * 0.18, 20 * k, 36 * k);
+        var ptrKey = 'pointer' + (1 + put % 6);
+        var ptrInfo = A.size(ptrKey);
+        A.draw(ctx, ptrKey,
+          nc * cell + cell * 0.42, nr * cell + cell * 0.14,
+          ptrInfo ? ptrInfo.w : 20, ptrInfo ? ptrInfo.h : 36);
         break;
       }
     }
@@ -1274,8 +1291,11 @@
         if (this.isSpot(nc, nr)) continue;
         if (this.towerAt(nc, nr)) continue;
         put += 1;
-        A.draw(ctx, 'fence' + (1 + put % 10),
-          nc * cell + 6 * k, nr * cell + cell - 21 * k, 32 * k, 18 * k);
+        var fenceKey = 'fence' + (1 + put % 10);
+        var fenceInfo = A.size(fenceKey);
+        A.draw(ctx, fenceKey,
+          nc * cell + 8, nr * cell + cell - 32,
+          fenceInfo ? fenceInfo.w * 2 : 54, fenceInfo ? fenceInfo.h * 2 : 30);
         break;
       }
     }
@@ -1383,7 +1403,7 @@
     var A = TD.Assets;
     var cell = this.grid.cell;
     var k = cell / 40;
-    var pad = cell + 6;
+    var pad = 62;
 
     for (var i = 0; i < this.spots.length; i++) {
       var s = this.spots[i];
@@ -1432,37 +1452,21 @@
       var bounce = t.recoil * 2;
 
       if (A && A.has('towerIdle1')) {
-        var levelScale = t.level >= 3 ? 1.06 : 1;
-        var tw = cell * 1.28 * levelScale;
-        var th = tw * (130 / 70);
+        /* натуральный размер кадра 70×130 — без дробного растяжения */
+        var tw = 70;
+        var th = 130;
         var baseY = t.y + cell * 0.55;
         var top = baseY - th - bounce;
         var frame = Math.floor(this.time * 5 + t.id * 0.7) % 6;
+        var towerImg = this.towerFrame(t, TD.clamp(t.level, 1, 3), frame);
 
         ctx.save();
-        A.frame(ctx, 'towerIdle' + TD.clamp(t.level, 1, 3), frame, 6, t.x - tw / 2, top, tw, th);
+        if (towerImg) ctx.drawImage(towerImg, t.x - tw / 2, top, tw, th);
+        else A.frame(ctx, 'towerIdle' + TD.clamp(t.level, 1, 3), frame, 6, t.x - tw / 2, top, tw, th);
         ctx.restore();
 
-        /* цветной вымпел на башне — тип виден без перекраски всего здания */
-        var bannerW = 12 * k;
-        var bannerH = th * 0.11;
-        var bannerY = top + th * 0.46;
-        ctx.save();
-        ctx.fillStyle = t.def.color;
-        ctx.strokeStyle = '#2a1b10';
-        ctx.lineWidth = 2 * k;
-        ctx.beginPath();
-        ctx.moveTo(t.x - bannerW / 2, bannerY);
-        ctx.lineTo(t.x + bannerW / 2, bannerY);
-        ctx.lineTo(t.x + bannerW / 2, bannerY + bannerH);
-        ctx.lineTo(t.x, bannerY + bannerH + 5 * k);
-        ctx.lineTo(t.x - bannerW / 2, bannerY + bannerH);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = '#fff2c2';
-        ctx.fillRect(t.x - 2 * k, bannerY + 3 * k, 4 * k, 4 * k);
-        ctx.restore();
+        /* эмблема типа: пушка, снежинка, молния, прицел или стрела */
+        this.drawTowerEmblem(ctx, t, t.x, top + th * 0.44);
 
         /* цветное кольцо типа у основания */
         ctx.save();
@@ -1493,20 +1497,154 @@
     if (this.selected) this.drawRange(ctx, this.selected.x, this.selected.y, this.selected.stats.range * cell, this.selected.def.color);
   };
 
+  /** Кадр башни с перекрашенным флажком под цвет типа (кэшируется). */
+  Game.prototype.towerFrame = function (t, level, frame) {
+    var A = TD.Assets;
+    if (!A || !A.has('towerIdle1') || typeof document === 'undefined') return null;
+    var key = t.def.id + '_' + level + '_' + frame;
+    if (!this._towerFrames) this._towerFrames = {};
+    if (this._towerFrames[key]) return this._towerFrames[key];
+    var cv = document.createElement('canvas');
+    cv.width = 70;
+    cv.height = 130;
+    var c = cv.getContext('2d');
+    c.imageSmoothingEnabled = false;
+    A.frame(c, 'towerIdle' + level, frame, 6, 0, 0, 70, 130);
+    /* крыша в цвет типа — башни перестают быть одинаковыми */
+    if (t.def.id !== 'arrow') {
+      c.globalCompositeOperation = 'source-atop';
+      c.globalAlpha = 0.52;
+      c.fillStyle = t.def.color;
+      c.fillRect(3, 28, 64, 60);
+      c.globalAlpha = 1;
+      c.globalCompositeOperation = 'source-over';
+    }
+    /* флажок на башне: красим только его, не трогая камень и крышу */
+    c.globalCompositeOperation = 'source-atop';
+    c.globalAlpha = 0.88;
+    c.fillStyle = t.def.color;
+    c.fillRect(20, 19, 18, 13);
+    c.globalAlpha = 1;
+    c.globalCompositeOperation = 'source-over';
+    this._towerFrames[key] = cv;
+    return cv;
+  };
+
+  /** Эмблема на башне, чтобы тип читался с первого взгляда. */
+  Game.prototype.drawTowerEmblem = function (ctx, t, x, y) {
+    var id = t.def.id;
+    var r = 13;
+    ctx.save();
+
+    /* цветная лента-подложка, чтобы тип читался даже без символа */
+    ctx.fillStyle = t.def.color;
+    ctx.strokeStyle = '#2a1b10';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x - 20, y - 8);
+    ctx.lineTo(x + 20, y - 8);
+    ctx.lineTo(x + 16, y);
+    ctx.lineTo(x + 20, y + 8);
+    ctx.lineTo(x - 20, y + 8);
+    ctx.lineTo(x - 16, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(18,28,42,0.92)';
+    ctx.strokeStyle = '#fff2c2';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = '#fff2c2';
+    ctx.fillStyle = '#fff2c2';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+
+    if (id === 'arrow') {
+      ctx.beginPath();
+      ctx.moveTo(x, y + 7);
+      ctx.lineTo(x, y - 5);
+      ctx.moveTo(x - 5, y);
+      ctx.lineTo(x, y - 6);
+      ctx.lineTo(x + 5, y);
+      ctx.stroke();
+    } else if (id === 'cannon') {
+      ctx.fillStyle = '#e0a45a';
+      ctx.fillRect(x - 7, y - 4, 11, 7);
+      ctx.strokeStyle = '#3a2a10';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x - 7, y - 4, 11, 7);
+      ctx.beginPath();
+      ctx.arc(x + 5, y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#3a2a10';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x + 5, y, 2, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffb703';
+      ctx.fill();
+      ctx.strokeStyle = '#fff2c2';
+      ctx.beginPath();
+      ctx.moveTo(x - 5, y + 4);
+      ctx.lineTo(x - 1, y + 4);
+      ctx.stroke();
+    } else if (id === 'frost') {
+      ctx.strokeStyle = '#a9e9ff';
+      for (var a = 0; a < 3; a++) {
+        var ang = Math.PI / 3 * a;
+        var dx = Math.cos(ang) * 7;
+        var dy = Math.sin(ang) * 7;
+        ctx.beginPath();
+        ctx.moveTo(x - dx, y - dy);
+        ctx.lineTo(x + dx, y + dy);
+        ctx.stroke();
+      }
+    } else if (id === 'tesla') {
+      ctx.fillStyle = '#ffe066';
+      ctx.beginPath();
+      ctx.moveTo(x + 1, y - 8);
+      ctx.lineTo(x - 5, y + 1);
+      ctx.lineTo(x, y + 1);
+      ctx.lineTo(x - 2, y + 8);
+      ctx.lineTo(x + 6, y - 2);
+      ctx.lineTo(x + 1, y - 2);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      /* снайпер — прицел */
+      ctx.strokeStyle = '#b9ffd9';
+      ctx.beginPath();
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - 9, y);
+      ctx.lineTo(x - 3, y);
+      ctx.moveTo(x + 3, y);
+      ctx.lineTo(x + 9, y);
+      ctx.moveTo(x, y - 9);
+      ctx.lineTo(x, y - 3);
+      ctx.moveTo(x, y + 3);
+      ctx.lineTo(x, y + 9);
+      ctx.stroke();
+    }
+    ctx.restore();
+  };
+
   /** Лучник в окне башни-стрелка: ожидание и выстрел. */
   Game.prototype.drawTowerArcher = function (ctx, t, tw, th, top, baseY) {
     var A = TD.Assets;
     if (!A || !A.has('archerIdle')) return;
-    var cell = this.grid.cell;
-    var k = cell / 40;
     var attack = t.attackAnim > 0;
     var key = attack ? 'archerAttack' : 'archerIdle';
     var frames = attack ? 6 : 4;
     var frame = attack
       ? Math.min(5, Math.floor((0.5 - t.attackAnim) * 12))
       : Math.floor(this.time * 6 + t.id) % 4;
-    var size = cell * 0.9;
-    var feet = baseY - th * 0.25;
+    var size = 48;
+    var feet = baseY - th * 0.12;
     var uy = feet - size * 0.8125;
     ctx.save();
     A.frame(ctx, key, frame, frames, t.x - size / 2, uy, size, size);
@@ -1517,8 +1655,8 @@
     var cell = this.grid.cell;
     for (var i = 0; i < this.towers.length; i++) {
       var t = this.towers[i];
-      if (Math.abs(x - t.x) > cell * 0.55) continue;
-      if (y > t.y - cell * 1.9 && y < t.y + cell * 0.55) return t;
+      if (Math.abs(x - t.x) > cell * 0.8) continue;
+      if (y > t.y - cell * 2.5 && y < t.y + cell * 0.55) return t;
     }
     return null;
   };
@@ -1833,7 +1971,7 @@
     }
     var t = this.pointerTower();
     if (t) {
-      this.drawTooltip(ctx, t.x, t.y - this.grid.cell * 1.5, [
+      this.drawTooltip(ctx, t.x, t.y - this.grid.cell * 2.2, [
         t.def.name + ' · ур. ' + t.level,
         'урон ' + Math.round(t.stats.damage) + ' · радиус ' + t.stats.range.toFixed(1) + ' кл.'
       ], t.def.color);
@@ -1900,8 +2038,8 @@
       ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
       if (ok) {
         var A = TD.Assets;
-        var tw = cell * 1.28;
-        var th = tw * (130 / 70);
+        var tw = 70;
+        var th = 130;
         var baseY = center.y + cell * 0.55;
         ctx.globalAlpha = 0.7;
         if (A && A.has('towerIdle1')) {

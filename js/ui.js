@@ -272,6 +272,15 @@
       var h = size - 2;
       var w = h * 70 / 130;
       A.frame(c, 'towerIdle2', 0, 6, (size - w) / 2, 1, w, h);
+      c.globalCompositeOperation = 'source-atop';
+      c.globalAlpha = 0.5;
+      c.fillStyle = def.color;
+      c.fillRect(0, size * 0.22, size, size * 0.46);
+      c.globalAlpha = 1;
+      c.globalCompositeOperation = 'source-over';
+      c.strokeStyle = def.color;
+      c.lineWidth = 2;
+      c.strokeRect(1, 1, size - 2, size - 2);
       return cv;
     }
 
@@ -1118,8 +1127,8 @@
          Резервируем место под инспектор, чтобы при выделении башни
          масштаб не прыгал. */
       app.style.zoom = '1';
-      var w = Math.max(app.offsetWidth || 0, 1486);
-      var h = Math.max(app.offsetHeight || 0, 815);
+      var w = Math.max(app.offsetWidth || 0, TD.Config.width + 334);
+      var h = Math.max(app.offsetHeight || 0, TD.Config.height + 95);
       var scale = Math.min(1.35, (vw - 40) / w, (vh - 40) / h);
       scale = Math.max(0.35, Math.round(scale * 1000) / 1000);
       app.style.zoom = String(scale);

@@ -7,9 +7,9 @@
   TD.Config = {
     cols: 24,
     rows: 15,
-    cell: 48,
-    width: 1152,
-    height: 720,
+    cell: 56,
+    width: 1344,
+    height: 840,
 
     startGold: 450,
     startLives: 20,
@@ -102,7 +102,7 @@
       chainFalloff: 0.7,
       chainRange: 2.2,
       air: true,
-      color: '#a9f0ff',
+      color: '#b06cff',
       towerTint: 'hue-rotate(235deg) saturate(1.3)',
       desc: 'Молния перескакивает на 3 цели, каждая следующая слабее.',
       hotkey: '4'
@@ -118,7 +118,7 @@
       attack: 'beam',
       pierceArmor: true,
       air: true,
-      color: '#3ddc97',
+      color: '#ff6b6b',
       towerTint: 'hue-rotate(75deg) saturate(0.85) brightness(0.92)',
       desc: 'Дальний точный выстрел, игнорирует броню. Идеален против боссов.',
       hotkey: '5'
@@ -134,7 +134,7 @@
       id: 'slime', name: 'Слизень', sprite: 'enemy_slime',
       hp: 40, speed: 1.1, armor: 0, gold: 4, points: 10, lives: 1,
       color: '#8ee04f',
-      anim: 'e1', animScale: 2.6,
+      anim: 'e1', animScale: 3.0,
       desc: 'Базовый враг: медленный, но идёт толпой.'
     },
     runner: {
@@ -148,21 +148,21 @@
       id: 'swarm', name: 'Роевик', sprite: 'enemy_swarm',
       hp: 15, speed: 1.6, armor: 0, gold: 2, points: 5, lives: 1,
       color: '#a94cff',
-      anim: 'e1', animScale: 1.5, animTint: 'hue-rotate(240deg) saturate(1.5)',
+      anim: 'e1', animScale: 2.0, animTint: 'hue-rotate(240deg) saturate(1.5)',
       desc: 'Мелкие и дешёвые, атакуют роем.'
     },
     brute: {
       id: 'brute', name: 'Громила', sprite: 'enemy_brute',
       hp: 160, speed: 0.8, armor: 2, gold: 12, points: 30, lives: 1,
       color: '#e09a5a',
-      anim: 'e2', animScale: 2.2,
+      anim: 'e2', animScale: 2.0,
       desc: 'Танк: много здоровья и брони, но медленный.'
     },
     shield: {
       id: 'shield', name: 'Щитоносец', sprite: 'enemy_shield',
       hp: 120, speed: 0.9, armor: 6, gold: 14, points: 35, lives: 1,
       color: '#72b8ff',
-      anim: 'e2', animScale: 1.95, animTint: 'hue-rotate(165deg) saturate(1.15)', shield: true,
+      anim: 'e2', animScale: 2.0, animTint: 'hue-rotate(165deg) saturate(1.15)', shield: true,
       desc: 'Стальной щит: высокая броня. Снайпер её игнорирует.'
     },
     flyer: {
@@ -170,7 +170,7 @@
       hp: 60, speed: 1.4, armor: 0, gold: 8, points: 20, lives: 1,
       flying: true,
       color: '#7fe3ff',
-      anim: 'e4', animScale: 2.1,
+      anim: 'e4', animScale: 2.0,
       desc: 'Летит по прямой к сердцу, игнорируя лабиринт.'
     },
     boss: {
@@ -178,7 +178,7 @@
       hp: 1500, speed: 0.6, armor: 5, gold: 120, points: 400, lives: 5,
       boss: true,
       color: '#ff5f74',
-      anim: 'e2', animScale: 3.2, animTint: 'hue-rotate(-25deg) saturate(1.4) brightness(0.95)', crown: true,
+      anim: 'e2', animScale: 3.0, animTint: 'hue-rotate(-25deg) saturate(1.4) brightness(0.95)', crown: true,
       desc: 'Владыка: огромный запас HP. При смерти делится на трёх громил.'
     }
   };
