@@ -9,6 +9,8 @@
   var TD = root.TD = root.TD || {};
 
   var BASE = 'free-fields-tileset-pixel-art-for-tower-defense/';
+  var TOWER_BASE = 'free-archer-towers-pixel-art-for-tower-defense/';
+  var ENEMY_BASE = 'free-field-enemies-pixel-art-for-tower-defense/';
   var TILE = 32;
 
   /* key → путь внутри набора */
@@ -45,6 +47,25 @@
   FILES.towerPlace1 = '2 Objects/PlaceForTower1.png';
   FILES.towerPlace2 = '2 Objects/PlaceForTower2.png';
 
+  /* Анимации башни-стрелка и её лучников. */
+  var TOWER_FILES = {
+    towerIdle1: '2 Idle/6.png',
+    towerIdle2: '2 Idle/7.png',
+    towerIdle3: '2 Idle/7.png',
+    towerBuild: '1 Upgrade/7.png',
+    archerIdle: '3 Units/1/S_Idle.png',
+    archerAttack: '3 Units/1/S_Attack.png'
+  };
+
+  /* Анимации четырёх монстров: ходьба в трёх направлениях + смерть. */
+  var ENEMY_FILES = {};
+  [1, 2, 3, 4].forEach(function (n) {
+    ['S', 'D', 'U'].forEach(function (dir) {
+      ENEMY_FILES['e' + n + dir + 'Walk'] = n + '/' + dir + '_Walk.png';
+    });
+    ENEMY_FILES['e' + n + 'SDeath'] = n + '/S_Death.png';
+  });
+
   var images = {};
   var failed = {};
   var started = 0;
@@ -62,7 +83,7 @@
     return !!get(name);
   }
 
-  function loadOne(name, relPath) {
+  function loadOne(name, relPath, base) {
     if (typeof document === 'undefined' || !document.createElement) return;
     var img = new Image();
     started += 1;
@@ -72,12 +93,18 @@
     img.onerror = function () {
       failed[name] = true;
     };
-    img.src = encodeURI(BASE + relPath);
+    img.src = encodeURI((base || BASE) + relPath);
     images[name] = img;
   }
 
   Object.keys(FILES).forEach(function (name) {
-    loadOne(name, FILES[name]);
+    loadOne(name, FILES[name], BASE);
+  });
+  Object.keys(TOWER_FILES).forEach(function (name) {
+    loadOne(name, TOWER_FILES[name], TOWER_BASE);
+  });
+  Object.keys(ENEMY_FILES).forEach(function (name) {
+    loadOne(name, ENEMY_FILES[name], ENEMY_BASE);
   });
 
   /**
@@ -129,14 +156,18 @@
   }
 
   function ready() {
-    var total = Object.keys(FILES).length;
+    var total = Object.keys(FILES).length + Object.keys(TOWER_FILES).length + Object.keys(ENEMY_FILES).length;
     return loadedCount + Object.keys(failed).length >= total;
   }
 
   TD.Assets = {
     BASE: BASE,
+    TOWER_BASE: TOWER_BASE,
+    ENEMY_BASE: ENEMY_BASE,
     TILE: TILE,
     FILES: FILES,
+    TOWER_FILES: TOWER_FILES,
+    ENEMY_FILES: ENEMY_FILES,
     get: get,
     has: has,
     draw: draw,

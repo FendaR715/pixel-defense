@@ -66,6 +66,7 @@
     this.effects = [];
     this.particles = [];
     this.floats = [];
+    this.deaths = [];
 
     this.buildType = null;
     this.selected = null;
@@ -388,7 +389,8 @@
       targetMode: 'first',
       invested: def.price,
       angle: -Math.PI / 2,
-      shots: 0
+      shots: 0,
+      attackAnim: 0
     };
     this.grid.place(c, r, tower);
     this.towers.push(tower);
@@ -489,6 +491,9 @@
       slowUntil: 0,
       slowFactor: 1,
       hitFlash: 0,
+      dir: 'S',
+      flipX: false,
+      animTime: 0,
       dead: false,
       phase: Math.random() * Math.PI * 2
     };
@@ -553,6 +558,14 @@
     this.burst(e.x, e.y, e.def.color, e.boss ? 30 : 10);
     this.sound(e.boss ? 'explode' : 'kill');
 
+    if (e.def.anim) {
+      this.deaths.push({
+        x: e.x, y: e.y, def: e.def, dir: e.dir, flipX: e.flipX,
+        t: 0, dur: 0.65, boss: e.boss
+      });
+      if (this.deaths.length > 40) this.deaths.shift();
+    }
+
     if (e.boss) {
       this.shake = Math.max(this.shake, 0.45);
       this.addEffect({ type: 'boom', x: e.x, y: e.y, radius: 90, color: '#ef476f', dur: 0.5 });
@@ -588,6 +601,8 @@
     if (e.slowUntil > this.time) speed *= e.slowFactor;
     var remain = speed * dt;
     var guard = 0;
+    var startX = e.x;
+    var startY = e.y;
     while (remain > 0.0001 && e.pathIndex < e.path.length && guard++ < 128) {
       var wp = e.path[e.pathIndex];
       var dx = wp.x - e.x;
@@ -613,6 +628,18 @@
       return;
     }
     if (!e.flying) e.cell = this.grid.pixelToCell(e.x, e.y);
+
+    var mdx = e.x - startX;
+    var mdy = e.y - startY;
+    if (Math.abs(mdx) > 0.05 || Math.abs(mdy) > 0.05) {
+      e.animTime += dt;
+      if (Math.abs(mdx) >= Math.abs(mdy)) {
+        e.dir = 'S';
+        e.flipX = mdx > 0;
+      } else {
+        e.dir = mdy < 0 ? 'U' : 'D';
+      }
+    }
   };
 
   /* ================= выстрелы ================= */
@@ -645,12 +672,14 @@
     var dmg = t.stats.damage;
     t.recoil = 1;
     t.shots += 1;
+    t.attackAnim = 0.5;
     t.angle = Math.atan2(target.y - t.y, target.x - t.x);
+    var muzzleY = t.y - C.cell * 0.55;
 
     if (def.attack === 'projectile' || def.attack === 'splash' || def.attack === 'slow') {
       this.projectiles.push({
         x: t.x,
-        y: t.y - 8,
+        y: muzzleY,
         target: target,
         speed: def.projSpeed * C.cell,
         damage: dmg,
@@ -667,7 +696,7 @@
     } else if (def.attack === 'beam') {
       this.damageEnemy(target, dmg, { pierceArmor: !!def.pierceArmor });
       this.addEffect({
-        type: 'beam', x1: t.x, y1: t.y - 10, x2: target.x, y2: target.y,
+        type: 'beam', x1: t.x, y1: muzzleY, x2: target.x, y2: target.y,
         color: def.color, dur: 0.16, width: 2, kind: 'sniper'
       });
       this.sound('sniper');
@@ -682,7 +711,7 @@
     var dmg = t.stats.damage;
     this.damageEnemy(target, dmg, {});
     this.addEffect({
-      type: 'beam', x1: t.x, y1: t.y - 12, x2: target.x, y2: target.y,
+      type: 'beam', x1: t.x, y1: t.y - C.cell * 0.55, x2: target.x, y2: target.y,
       color: def.color, dur: 0.14, width: 2, kind: 'tesla'
     });
     var last = target;
@@ -763,6 +792,11 @@
       f.y -= 26 * dt;
       if (f.life <= 0) this.floats.splice(i, 1);
     }
+    for (i = this.deaths.length - 1; i >= 0; i--) {
+      var de = this.deaths[i];
+      de.t += dt;
+      if (de.t >= de.dur) this.deaths.splice(i, 1);
+    }
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 2.2);
   };
 
@@ -819,6 +853,7 @@
       var t = this.towers[i];
       if (t.cooldown > 0) t.cooldown -= dt;
       if (t.recoil > 0) t.recoil = Math.max(0, t.recoil - dt * 4);
+      if (t.attackAnim > 0) t.attackAnim = Math.max(0, t.attackAnim - dt);
       var target = this.findTarget(t);
       if (!target) continue;
       t.angle = Math.atan2(target.y - t.y, target.x - t.x);
@@ -931,6 +966,7 @@
     this.drawSpots(ctx);
     this.drawTowers(ctx);
     this.drawEnemies(ctx);
+    this.drawDeaths(ctx);
     this.drawProjectiles(ctx);
     this.drawEffects(ctx);
     this.drawParticles(ctx);
@@ -966,10 +1002,13 @@
           ctx.fillRect(x, y, cell, cell);
         }
         /* тёмная каменистая подложка, чтобы стена читалась как препятствие */
-        ctx.save();
-        ctx.globalAlpha = 0.42;
-        TD.Sprites.draw(ctx, 'rock', x, y, cell, cell);
-        ctx.restore();
+        /* мягкая тень под валунами вместо растянутой каменной плитки */
+        if (A && A.has('shadow1')) {
+          ctx.save();
+          ctx.globalAlpha = 0.45;
+          A.draw(ctx, 'shadow' + (1 + d.deco % 6), x + cell * 0.12, y + cell * 0.68, cell * 0.76, cell * 0.16);
+          ctx.restore();
+        }
         if (A && A.has('stone3')) {
           var bigStones = ['stone3', 'stone9', 'stone11', 'stone13', 'stone15'];
           var stoneKey = bigStones[d.deco % bigStones.length];
@@ -983,7 +1022,11 @@
           A.draw(ctx, stoneKey, x + (cell - bw) / 2, y + cell - bh - 2 * k, bw, bh);
 
           var smallStones = ['stone2', 'stone5', 'stone6', 'stone10', 'stone14'];
-          A.draw(ctx, smallStones[d.deco % smallStones.length], x + cell * 0.58, y + cell * 0.58, 14 * k, 11 * k);
+          var smallKey = smallStones[d.deco % smallStones.length];
+          var smallInfo = A.size(smallKey);
+          var sw = 14 * k;
+          var sh = smallInfo ? sw * (smallInfo.h / smallInfo.w) : 11 * k;
+          A.draw(ctx, smallKey, x + cell * 0.58, y + cell * 0.58, sw, sh);
         } else {
           TD.Sprites.draw(ctx, 'rock', x, y, cell, cell);
         }
@@ -1034,8 +1077,12 @@
             x + 6 * k + (d.deco % 20), y + 8 * k + ((d.deco >> 3) % 18), 12 * k, 12 * k);
         }
         if (A && A.has('stone1') && d.pebble) {
-          A.draw(ctx, 'stone' + (1 + d.deco % 16),
-            x + 8 * k + (d.deco % 16), y + 22 * k + (d.deco % 8), 12 * k, 10 * k);
+          var pebbles = ['stone1', 'stone2', 'stone5', 'stone6', 'stone10', 'stone14'];
+          var pk = pebbles[d.deco % pebbles.length];
+          var pi = A.size(pk);
+          var pw = 12 * k;
+          var ph = pi ? pw * (pi.h / pi.w) : 10 * k;
+          A.draw(ctx, pk, x + 8 * k + (d.deco % 16), y + 22 * k + (d.deco % 8), pw, ph);
         }
       }
     }
@@ -1376,23 +1423,104 @@
   Game.prototype.drawTowers = function (ctx) {
     var cell = this.grid.cell;
     var k = cell / 40;
+    var A = TD.Assets;
     var drawSize = cell + 6;
-    for (var i = 0; i < this.towers.length; i++) {
-      var t = this.towers[i];
+    var list = this.towers.slice().sort(function (a, b) { return a.y - b.y; });
+
+    for (var i = 0; i < list.length; i++) {
+      var t = list[i];
       var bounce = t.recoil * 2;
 
-      TD.Sprites.draw(ctx, t.def.sprite, t.x - drawSize / 2, t.y - drawSize / 2 - bounce, drawSize, drawSize);
+      if (A && A.has('towerIdle1')) {
+        var levelScale = t.level >= 3 ? 1.06 : 1;
+        var tw = cell * 1.28 * levelScale;
+        var th = tw * (130 / 70);
+        var baseY = t.y + cell * 0.55;
+        var top = baseY - th - bounce;
+        var frame = Math.floor(this.time * 5 + t.id * 0.7) % 6;
+
+        ctx.save();
+        A.frame(ctx, 'towerIdle' + TD.clamp(t.level, 1, 3), frame, 6, t.x - tw / 2, top, tw, th);
+        ctx.restore();
+
+        /* цветной вымпел на башне — тип виден без перекраски всего здания */
+        var bannerW = 12 * k;
+        var bannerH = th * 0.11;
+        var bannerY = top + th * 0.46;
+        ctx.save();
+        ctx.fillStyle = t.def.color;
+        ctx.strokeStyle = '#2a1b10';
+        ctx.lineWidth = 2 * k;
+        ctx.beginPath();
+        ctx.moveTo(t.x - bannerW / 2, bannerY);
+        ctx.lineTo(t.x + bannerW / 2, bannerY);
+        ctx.lineTo(t.x + bannerW / 2, bannerY + bannerH);
+        ctx.lineTo(t.x, bannerY + bannerH + 5 * k);
+        ctx.lineTo(t.x - bannerW / 2, bannerY + bannerH);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#fff2c2';
+        ctx.fillRect(t.x - 2 * k, bannerY + 3 * k, 4 * k, 4 * k);
+        ctx.restore();
+
+        /* цветное кольцо типа у основания */
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.strokeStyle = t.def.color;
+        ctx.lineWidth = 2 * k;
+        ctx.beginPath();
+        ctx.ellipse(t.x, t.y + cell * 0.30, cell * 0.42, cell * 0.14, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        if (t.def.id === 'arrow') {
+          this.drawTowerArcher(ctx, t, tw, th, top, baseY);
+        }
+      } else {
+        TD.Sprites.draw(ctx, t.def.sprite, t.x - drawSize / 2, t.y - drawSize / 2 - bounce, drawSize, drawSize);
+      }
 
       /* уровень: золотые пипсы */
       for (var lv = 0; lv < t.level; lv++) {
         ctx.fillStyle = '#3a2a10';
-        ctx.fillRect(t.x - 9 * k + lv * 7 * k, t.y + 18 * k, 5 * k, 4 * k);
+        ctx.fillRect(t.x - 9 * k + lv * 7 * k, t.y + cell * 0.48, 5 * k, 4 * k);
         ctx.fillStyle = '#ffc857';
-        ctx.fillRect(t.x - 8 * k + lv * 7 * k, t.y + 19 * k, 3 * k, 2 * k);
+        ctx.fillRect(t.x - 8 * k + lv * 7 * k, t.y + cell * 0.48 + k, 3 * k, 2 * k);
       }
     }
 
     if (this.selected) this.drawRange(ctx, this.selected.x, this.selected.y, this.selected.stats.range * cell, this.selected.def.color);
+  };
+
+  /** Лучник в окне башни-стрелка: ожидание и выстрел. */
+  Game.prototype.drawTowerArcher = function (ctx, t, tw, th, top, baseY) {
+    var A = TD.Assets;
+    if (!A || !A.has('archerIdle')) return;
+    var cell = this.grid.cell;
+    var k = cell / 40;
+    var attack = t.attackAnim > 0;
+    var key = attack ? 'archerAttack' : 'archerIdle';
+    var frames = attack ? 6 : 4;
+    var frame = attack
+      ? Math.min(5, Math.floor((0.5 - t.attackAnim) * 12))
+      : Math.floor(this.time * 6 + t.id) % 4;
+    var size = cell * 0.9;
+    var feet = baseY - th * 0.25;
+    var uy = feet - size * 0.8125;
+    ctx.save();
+    A.frame(ctx, key, frame, frames, t.x - size / 2, uy, size, size);
+    ctx.restore();
+  };
+
+  Game.prototype.towerAtPoint = function (x, y) {
+    var cell = this.grid.cell;
+    for (var i = 0; i < this.towers.length; i++) {
+      var t = this.towers[i];
+      if (Math.abs(x - t.x) > cell * 0.55) continue;
+      if (y > t.y - cell * 1.9 && y < t.y + cell * 0.55) return t;
+    }
+    return null;
   };
 
   Game.prototype.drawRange = function (ctx, x, y, radius, color) {
@@ -1412,10 +1540,14 @@
   Game.prototype.drawEnemies = function (ctx) {
     var cell = this.grid.cell;
     var k = cell / 40;
+    var A = TD.Assets;
     var list = this.enemies.slice().sort(function (a, b) { return a.y - b.y; });
     for (var i = 0; i < list.length; i++) {
       var e = list[i];
       var size = e.boss ? cell * 1.5 : cell;
+      var animSize = cell * (e.def.animScale || 1);
+      var vsize = e.def.anim ? animSize : size;
+      var barTop = e.y + cell * 0.30 - vsize * 0.58;
       var bob = e.flying ? Math.sin(this.time * 6 + e.phase) * 3 * k : 0;
       var y = e.y - size / 2 + bob;
 
@@ -1423,7 +1555,7 @@
       ctx.globalAlpha = e.flying ? 0.16 : 0.24;
       ctx.fillStyle = '#17331f';
       ctx.beginPath();
-      ctx.ellipse(e.x, e.y + 14 * k, size * 0.36, 5 * k, 0, 0, Math.PI * 2);
+      ctx.ellipse(e.x, e.y + 14 * k, vsize * 0.18, 5 * k, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
@@ -1432,7 +1564,7 @@
       ctx.globalAlpha = e.flying ? 0.4 : 0.55;
       ctx.fillStyle = e.def.color;
       ctx.beginPath();
-      ctx.ellipse(e.x, e.y + 14 * k, size * 0.31, 3.2 * k, 0, 0, Math.PI * 2);
+      ctx.ellipse(e.x, e.y + 14 * k, vsize * 0.15, 3.2 * k, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
@@ -1446,7 +1578,64 @@
         ctx.restore();
       }
 
-      TD.Sprites.draw(ctx, e.def.sprite, e.x - size / 2, y, size, size);
+      var drawn = false;
+      if (e.def.anim && A) {
+        var dir = e.dir || 'S';
+        var key = e.def.anim + dir + 'Walk';
+        if (!A.has(key)) key = e.def.anim + 'SWalk';
+        if (A.has(key)) {
+          var animSize = cell * (e.def.animScale || 1);
+          var frame = Math.floor(e.animTime * 9 + e.id * 0.37) % 6;
+          var fy = e.y + cell * 0.30 - animSize * 0.8125 + bob;
+          ctx.save();
+          if (e.def.animTint) ctx.filter = e.def.animTint;
+          if (e.flipX) {
+            ctx.translate(e.x, 0);
+            ctx.scale(-1, 1);
+            A.frame(ctx, key, frame, 6, -animSize / 2, fy, animSize, animSize);
+          } else {
+            A.frame(ctx, key, frame, 6, e.x - animSize / 2, fy, animSize, animSize);
+          }
+          ctx.restore();
+          drawn = true;
+
+          if (e.def.shield) {
+            var sx = e.x - animSize * 0.34;
+            var sy = e.y - animSize * 0.16 + bob;
+            ctx.save();
+            ctx.fillStyle = '#3f7fd0';
+            ctx.strokeStyle = '#ffd166';
+            ctx.lineWidth = 2 * k;
+            ctx.beginPath();
+            ctx.arc(sx, sy, animSize * 0.18, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+          }
+          if (e.def.crown) {
+            ctx.save();
+            ctx.fillStyle = '#ffd166';
+            ctx.strokeStyle = '#3a2a10';
+            ctx.lineWidth = k;
+            var cw = animSize * 0.26;
+            var cx = e.x;
+            var cy = fy + animSize * 0.1;
+            ctx.beginPath();
+            ctx.moveTo(cx - cw, cy);
+            ctx.lineTo(cx - cw, cy - cw * 0.55);
+            ctx.lineTo(cx - cw * 0.35, cy - cw * 0.18);
+            ctx.lineTo(cx, cy - cw * 0.75);
+            ctx.lineTo(cx + cw * 0.35, cy - cw * 0.18);
+            ctx.lineTo(cx + cw, cy - cw * 0.55);
+            ctx.lineTo(cx + cw, cy);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+      }
+      if (!drawn) TD.Sprites.draw(ctx, e.def.sprite, e.x - size / 2, y, size, size);
 
       if (e.slowUntil > this.time) {
         ctx.save();
@@ -1460,18 +1649,46 @@
 
       if (e.boss) {
         ctx.fillStyle = '#ffc857';
-        ctx.fillRect(e.x - 20 * k, y - 8 * k, 40 * k, 3 * k);
+        ctx.fillRect(e.x - 20 * k, barTop - 9 * k, 40 * k, 3 * k);
       }
 
       if (e.hp < e.maxHp || e.boss) {
         var w = e.boss ? 48 * k : 30 * k;
         var ratio = TD.clamp(e.hp / e.maxHp, 0, 1);
-        var by = y - (e.boss ? 14 : 9) * k;
+        var by = barTop;
         ctx.fillStyle = 'rgba(14,26,38,0.9)';
         ctx.fillRect(e.x - w / 2 - 1, by - 1, w + 2, 6 * k);
         ctx.fillStyle = ratio > 0.5 ? '#6ee06f' : (ratio > 0.25 ? '#ffc857' : '#ff5f7a');
         ctx.fillRect(e.x - w / 2, by, w * ratio, 4 * k);
       }
+    }
+  };
+
+  /** Короткая анимация смерти поверх трупа врага. */
+  Game.prototype.drawDeaths = function (ctx) {
+    var A = TD.Assets;
+    if (!A) return;
+    var cell = this.grid.cell;
+    for (var i = 0; i < this.deaths.length; i++) {
+      var d = this.deaths[i];
+      if (!d.def.anim) continue;
+      var key = d.def.anim + 'SDeath';
+      if (!A.has(key)) continue;
+      var size = cell * (d.def.animScale || 1);
+      var frame = Math.min(5, Math.floor((d.t / d.dur) * 6));
+      var fy = d.y + cell * 0.30 - size * 0.8125;
+      var alpha = 1 - Math.max(0, (d.t / d.dur - 0.55)) / 0.45;
+      ctx.save();
+      ctx.globalAlpha = TD.clamp(alpha, 0, 1);
+      if (d.def.animTint) ctx.filter = d.def.animTint;
+      if (d.flipX) {
+        ctx.translate(d.x, 0);
+        ctx.scale(-1, 1);
+        A.frame(ctx, key, frame, 6, -size / 2, fy, size, size);
+      } else {
+        A.frame(ctx, key, frame, 6, d.x - size / 2, fy, size, size);
+      }
+      ctx.restore();
     }
   };
 
@@ -1597,11 +1814,7 @@
 
   Game.prototype.pointerTower = function () {
     if (!this.pointer.active) return null;
-    for (var i = 0; i < this.towers.length; i++) {
-      var t = this.towers[i];
-      if (TD.dist(this.pointer.x, this.pointer.y, t.x, t.y) < 22) return t;
-    }
-    return null;
+    return this.towerAtPoint(this.pointer.x, this.pointer.y);
   };
 
   Game.prototype.drawTooltips = function (ctx) {
@@ -1620,7 +1833,7 @@
     }
     var t = this.pointerTower();
     if (t) {
-      this.drawTooltip(ctx, t.x, t.y - 24 * (this.grid.cell / 40), [
+      this.drawTooltip(ctx, t.x, t.y - this.grid.cell * 1.5, [
         t.def.name + ' · ур. ' + t.level,
         'урон ' + Math.round(t.stats.damage) + ' · радиус ' + t.stats.range.toFixed(1) + ' кл.'
       ], t.def.color);
@@ -1686,9 +1899,17 @@
       ctx.lineWidth = 2 * k;
       ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
       if (ok) {
+        var A = TD.Assets;
+        var tw = cell * 1.28;
+        var th = tw * (130 / 70);
+        var baseY = center.y + cell * 0.55;
         ctx.globalAlpha = 0.7;
-        var pad = cell + 6;
-        TD.Sprites.draw(ctx, def.sprite, center.x - pad / 2, center.y - pad / 2, pad, pad);
+        if (A && A.has('towerIdle1')) {
+          A.frame(ctx, 'towerIdle1', 0, 6, center.x - tw / 2, baseY - th, tw, th);
+        } else {
+          var pad = cell + 6;
+          TD.Sprites.draw(ctx, def.sprite, center.x - pad / 2, center.y - pad / 2, pad, pad);
+        }
         ctx.globalAlpha = 1;
         this.drawRange(ctx, center.x, center.y, def.range * (1 + C.upgradeRange * 0) * cell, def.color);
       } else {

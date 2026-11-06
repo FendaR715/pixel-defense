@@ -88,10 +88,13 @@
 
 <!-- ЭКРАНЫ -->
 
-<section class="screen" id="screen-menu">
-  <div class="screen__inner">
+<section class="screen screen--menu" id="screen-menu">
+  <canvas id="menu-scene" width="1280" height="760"></canvas>
+  <div class="menu-shade" aria-hidden="true"></div>
+  <div class="screen__inner screen__inner--menu">
+    <p class="menu-kicker">Tower Defense · 3 карты · 20 волн</p>
     <h1 class="logo"><span>ПИКСЕЛЬНАЯ</span><span class="logo__accent">ОБОРОНА</span></h1>
-    <p class="tagline">Tower Defense · 3 карты · 20 волн · полностью офлайн</p>
+    <p class="tagline">Полностью офлайн · без установки и сборки</p>
 
     <div class="menu">
       <button class="btn btn--big btn--accent" data-action="play">Играть</button>
@@ -102,6 +105,7 @@
     </div>
 
     <p class="hint">Прогресс сохраняется автоматически в этом браузере.</p>
+    <p class="menu-credit">Ассеты: CraftPix · v1.0</p>
   </div>
 </section>
 
@@ -218,6 +222,7 @@
 <script src="js/core/util.js"></script>
 <script src="js/core/sprites.js"></script>
 <script src="js/core/assets.js"></script>
+<script src="js/core/menu-scene.js"></script>
 <script src="js/core/audio.js"></script>
 <script src="js/data/maps.js"></script>
 <script src="js/data/defs.js"></script>

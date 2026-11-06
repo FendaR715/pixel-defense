@@ -132,12 +132,15 @@
       grid: true,
       path: false,
       testMode: false,
+      assetsReady: false,
       frame: 0,
       lastT: 0,
       bannerTimer: null,
       toastTimer: null
     };
     var ctx = null;
+    var menuCtx = null;
+    var menuTime = 0;
 
     /* ---------- DOM ---------- */
 
@@ -145,6 +148,7 @@
 
     function cacheDom() {
       els.canvas = $('game');
+      els.menuCanvas = $('menu-scene');
       els.toast = $('toast');
       els.banner = $('banner');
       els.bannerTitle = $('banner-title');
@@ -248,6 +252,7 @@
       }
       state.screen = id || null;
       document.body.classList.toggle('has-screen', !!id && id !== 'screen-pause');
+      if (id === 'screen-bestiary') renderBestiary();
     }
 
     function hideAllScreens() {
@@ -255,6 +260,33 @@
     }
 
     /* ---------- магазин ---------- */
+
+    function towerAssetIcon(def, size) {
+      var A = TD.Assets;
+      if (!A || !A.has('towerIdle2') || typeof document === 'undefined') return null;
+      var cv = document.createElement('canvas');
+      cv.width = size;
+      cv.height = size;
+      var c = cv.getContext('2d');
+      c.imageSmoothingEnabled = false;
+      var h = size - 2;
+      var w = h * 70 / 130;
+      A.frame(c, 'towerIdle2', 0, 6, (size - w) / 2, 1, w, h);
+      return cv;
+    }
+
+    function enemyAssetIcon(def, size) {
+      var A = TD.Assets;
+      if (!A || !def.anim || !A.has(def.anim + 'SWalk') || typeof document === 'undefined') return null;
+      var cv = document.createElement('canvas');
+      cv.width = size;
+      cv.height = size;
+      var c = cv.getContext('2d');
+      c.imageSmoothingEnabled = false;
+      var fs = size * 1.35;
+      A.frame(c, def.anim + 'SWalk', 0, 6, (size - fs) / 2, -size * 0.14, fs, fs);
+      return cv;
+    }
 
     function buildShop() {
       if (!els.shop) return;
@@ -270,7 +302,7 @@
 
         var iconWrap = document.createElement('span');
         iconWrap.className = 'shop__icon';
-        var icon = TD.Sprites.icon(def.sprite, 34);
+        var icon = towerAssetIcon(def, 34) || TD.Sprites.icon(def.sprite, 34);
         if (icon) {
           icon.style.width = '34px';
           icon.style.height = '34px';
@@ -675,7 +707,8 @@
 
       var iconWrap = document.createElement('div');
       iconWrap.className = 'beast__icon';
-      var icon = TD.Sprites.icon(def.sprite, 52);
+      var icon = (kind === 'tower' ? towerAssetIcon(def, 52) : enemyAssetIcon(def, 52)) ||
+        TD.Sprites.icon(def.sprite, 52);
       if (icon) {
         icon.style.width = '52px';
         icon.style.height = '52px';
@@ -886,7 +919,8 @@
       canvas.addEventListener('click', function (e) {
         var g = state.game;
         if (!g || g.finished || g.paused) return;
-        var cell = eventCell(e);
+        var p = eventPoint(e);
+        var cell = { c: p.c, r: p.r };
         if (g.buildType) {
           var res = g.placeTower(cell.c, cell.r, g.buildType);
           if (!res.ok) {
@@ -898,7 +932,7 @@
             updateInspector();
           }
         } else {
-          var t = g.towerAt(cell.c, cell.r);
+          var t = g.towerAtPoint(p.x, p.y) || g.towerAt(cell.c, cell.r);
           g.selectTower(t);
           if (!t) {
             g.setHover(cell.c, cell.r);
@@ -915,7 +949,8 @@
         e.preventDefault();
         var g = state.game;
         if (!g || g.finished) return;
-        var cell = eventCell(e);
+        var p = eventPoint(e);
+        var cell = { c: p.c, r: p.r };
         if (g.buildType) {
           g.buildType = null;
           updateShop();
@@ -923,7 +958,7 @@
           g.setHover(cell.c, cell.r);
           return;
         }
-        var t = g.towerAt(cell.c, cell.r);
+        var t = g.towerAtPoint(p.x, p.y) || g.towerAt(cell.c, cell.r);
         if (t) {
           var res = g.sellTower(t);
           if (res.ok) toast('Башня продана: +' + res.refund + ' ◈', 'good');
@@ -1100,6 +1135,11 @@
     function loop(ts) {
       var dt = state.lastT ? (ts - state.lastT) / 1000 : 0;
       state.lastT = ts;
+      if (!state.assetsReady && TD.Assets && TD.Assets.ready()) {
+        state.assetsReady = true;
+        buildShop();
+        renderBestiary();
+      }
       var g = state.game;
       if (g && !g.paused && !g.finished) {
         g.update(dt);
@@ -1109,6 +1149,9 @@
         updateHud();
         updateInspector();
         state.frame += 1;
+      } else if (state.screen === 'screen-menu' && menuCtx && TD.MenuScene) {
+        menuTime += Math.min(dt, 0.05);
+        TD.MenuScene.render(menuCtx, menuTime);
       }
       root.requestAnimationFrame(loop);
     }
@@ -1123,6 +1166,8 @@
         return;
       }
       if (ctx) ctx.imageSmoothingEnabled = false;
+      if (els.menuCanvas) menuCtx = els.menuCanvas.getContext('2d');
+      if (menuCtx) menuCtx.imageSmoothingEnabled = false;
 
       var saved = Save.load();
       state.sound = saved.settings.sound !== false;

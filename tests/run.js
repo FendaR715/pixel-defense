@@ -101,24 +101,41 @@ test('sprites: все описания 16×16 и с полной палитро�
   assert(names.length >= 16, 'ожидалось минимум 16 спрайтов, есть ' + names.length);
 });
 
-test('assets: набор free-fields на месте, PNG читаются', () => {
+test('assets: все три набора на месте, PNG читаются', () => {
   const base = path.join(ROOT, 'free-fields-tileset-pixel-art-for-tower-defense');
-  const files = TD.Assets.FILES;
-  const names = Object.keys(files);
-  assert(names.length >= 20, 'слишком мало ассетов: ' + names.length);
-  names.forEach((name) => {
-    const p = path.join(base, files[name]);
-    assert(fs.existsSync(p), 'нет файла ' + files[name]);
-    const buf = fs.readFileSync(p);
-    assertEqual(buf.slice(1, 4).toString('latin1'), 'PNG', name + ': не PNG');
-    const w = buf.readUInt32BE(16);
-    const h = buf.readUInt32BE(20);
-    assert(w > 0 && h > 0, name + ': пустое изображение');
-  });
+  const towerBase = path.join(ROOT, 'free-archer-towers-pixel-art-for-tower-defense');
+  const enemyBase = path.join(ROOT, 'free-field-enemies-pixel-art-for-tower-defense');
+
+  function checkFiles(files, root, label) {
+    const names = Object.keys(files);
+    assert(names.length > 0, label + ': пустой список');
+    names.forEach((name) => {
+      const p = path.join(root, files[name]);
+      assert(fs.existsSync(p), label + ': нет файла ' + files[name]);
+      const buf = fs.readFileSync(p);
+      assertEqual(buf.slice(1, 4).toString('latin1'), 'PNG', name + ': не PNG');
+      const w = buf.readUInt32BE(16);
+      const h = buf.readUInt32BE(20);
+      assert(w > 0 && h > 0, name + ': пустое изображение');
+    });
+  }
+
+  checkFiles(TD.Assets.FILES, base, 'fields');
+  checkFiles(TD.Assets.TOWER_FILES, towerBase, 'towers');
+  checkFiles(TD.Assets.ENEMY_FILES, enemyBase, 'enemies');
+
   const tileset = path.join(base, TD.Assets.FILES.fields);
   const tbuf = fs.readFileSync(tileset);
   assertEqual(tbuf.readUInt32BE(16), 256, 'тайлсет: ширина');
   assertEqual(tbuf.readUInt32BE(20), 256, 'тайлсет: высота');
+
+  Object.values(TD.EnemyDefs).forEach((def) => {
+    if (!def.anim) return;
+    assert(TD.Assets.ENEMY_FILES[def.anim + 'SWalk'], def.id + ': нет S_Walk');
+    assert(TD.Assets.ENEMY_FILES[def.anim + 'SDeath'], def.id + ': нет S_Death');
+  });
+  assert(TD.Assets.TOWER_FILES.towerIdle1 && TD.Assets.TOWER_FILES.archerIdle,
+    'не заданы анимации башни/лучника');
 });
 
 /* ---------- карты и путь ---------- */
