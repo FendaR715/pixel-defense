@@ -1127,9 +1127,9 @@
          Резервируем место под инспектор, чтобы при выделении башни
          масштаб не прыгал. */
       app.style.zoom = '1';
-      var w = Math.max(app.offsetWidth || 0, TD.Config.width + 334);
+      var w = Math.max(app.offsetWidth || 0, TD.Config.width + 354);
       var h = Math.max(app.offsetHeight || 0, TD.Config.height + 95);
-      var scale = Math.min(1.35, (vw - 40) / w, (vh - 40) / h);
+      var scale = Math.min(1.0, (vw - 40) / w, (vh - 40) / h);
       scale = Math.max(0.35, Math.round(scale * 1000) / 1000);
       app.style.zoom = String(scale);
     }

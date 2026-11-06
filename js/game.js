@@ -221,7 +221,7 @@
           patch: ch === '.' && n2 > 0.8 && n2 < 0.84,
           prop: ch === '.' && n3 > 0.94,
           propType: (n3 > 0.97 ? 'box' : 'log'),
-          pebble: ch === '.' && n3 > 0.78 && n3 < 0.81,
+          pebble: false,
           flip: n > 0.5,
           deco: TD.hash('deco:' + c + ':' + r + ':' + this.levelIndex)
         });
@@ -676,7 +676,7 @@
     t.shots += 1;
     t.attackAnim = 0.5;
     t.angle = Math.atan2(target.y - t.y, target.x - t.x);
-    var muzzleY = t.y - C.cell * 1.25;
+    var muzzleY = t.y - C.cell * 1.0;
 
     if (def.attack === 'projectile' || def.attack === 'splash' || def.attack === 'slow') {
       this.projectiles.push({
@@ -713,7 +713,7 @@
     var dmg = t.stats.damage;
     this.damageEnemy(target, dmg, {});
     this.addEffect({
-      type: 'beam', x1: t.x, y1: t.y - C.cell * 1.25, x2: target.x, y2: target.y,
+      type: 'beam', x1: t.x, y1: t.y - C.cell * 1.0, x2: target.x, y2: target.y,
       color: def.color, dur: 0.14, width: 2, kind: 'tesla'
     });
     var last = target;
@@ -1003,28 +1003,29 @@
           ctx.fillStyle = pal.edge;
           ctx.fillRect(x, y, cell, cell);
         }
-        /* мягкая тень под валунами вместо растянутой каменной плитки */
-        if (A && A.has('shadow1')) {
-          ctx.save();
-          ctx.globalAlpha = 0.45;
-          A.draw(ctx, 'shadow' + (1 + d.deco % 6), x + cell * 0.12, y + cell * 0.68, cell * 0.76, cell * 0.16);
-          ctx.restore();
-        }
-        if (A && A.has('stone9')) {
-          /* целочисленный масштаб 2×: камни не «плывут» и сохраняют детали */
-          var bigStones = ['stone3', 'stone9', 'stone11', 'stone13', 'stone15'];
-          var stoneKey = bigStones[d.deco % bigStones.length];
-          var info = A.size(stoneKey);
-          var bw = info ? info.w * 2 : cell * 0.7;
-          var bh = info ? info.h * 2 : cell * 0.5;
-          A.draw(ctx, stoneKey, x + (cell - bw) / 2, y + cell - bh - 2 * k, bw, bh);
-
-          var smallStones = ['stone2', 'stone5', 'stone6', 'stone10', 'stone14'];
-          var smallKey = smallStones[d.deco % smallStones.length];
-          var smallInfo = A.size(smallKey);
-          var sw = smallInfo ? smallInfo.w * 2 : 22;
-          var sh = smallInfo ? smallInfo.h * 2 : 16;
-          A.draw(ctx, smallKey, x + cell * 0.58, y + cell * 0.58, sw, sh);
+        if (A && A.has('stone3')) {
+          /* валуны через клетку: скальные гряды остаются читаемыми,
+             но не превращаются в частокол из камней */
+          if (d.deco % 2 === 0) {
+            if (A.has('shadow1')) {
+              ctx.save();
+              ctx.globalAlpha = 0.45;
+              A.draw(ctx, 'shadow' + (1 + d.deco % 6), x + cell * 0.12, y + cell * 0.68, cell * 0.76, cell * 0.16);
+              ctx.restore();
+            }
+            /* целочисленный масштаб 2×: камни не «плывут» и сохраняют детали */
+            var bigStones = ['stone3', 'stone9', 'stone11', 'stone13', 'stone15'];
+            var stoneKey = bigStones[d.deco % bigStones.length];
+            var info = A.size(stoneKey);
+            var bw = info ? info.w * 2 : cell * 0.7;
+            var bh = info ? info.h * 2 : cell * 0.5;
+            A.draw(ctx, stoneKey, x + (cell - bw) / 2, y + cell - bh - 2 * k, bw, bh);
+          } else {
+            ctx.save();
+            ctx.globalAlpha = 0.18;
+            A.draw(ctx, 'shadow' + (1 + d.deco % 6), x + cell * 0.2, y + cell * 0.68, cell * 0.6, cell * 0.12);
+            ctx.restore();
+          }
         } else {
           TD.Sprites.draw(ctx, 'rock', x, y, cell, cell);
         }
@@ -1454,9 +1455,9 @@
       var bounce = t.recoil * 2;
 
       if (A && A.has('towerIdle1')) {
-        /* натуральный размер кадра 70×130 — без дробного растяжения */
-        var tw = 70;
-        var th = 130;
+        /* натуральный кадр 70×130 уменьшен до 56×104 — башни не давят на карту */
+        var tw = 56;
+        var th = 104;
         var baseY = t.y + cell * 0.55;
         var top = baseY - th - bounce;
         var frame = Math.floor(this.time * 5 + t.id * 0.7) % 6;
@@ -1535,7 +1536,7 @@
   /** Эмблема на башне, чтобы тип читался с первого взгляда. */
   Game.prototype.drawTowerEmblem = function (ctx, t, x, y) {
     var id = t.def.id;
-    var r = 13;
+    var r = 10;
     ctx.save();
 
     /* цветная лента-подложка, чтобы тип читался даже без символа */
@@ -1543,12 +1544,12 @@
     ctx.strokeStyle = '#2a1b10';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(x - 20, y - 8);
-    ctx.lineTo(x + 20, y - 8);
-    ctx.lineTo(x + 16, y);
-    ctx.lineTo(x + 20, y + 8);
-    ctx.lineTo(x - 20, y + 8);
-    ctx.lineTo(x - 16, y);
+    ctx.moveTo(x - 15, y - 6);
+    ctx.lineTo(x + 15, y - 6);
+    ctx.lineTo(x + 12, y);
+    ctx.lineTo(x + 15, y + 6);
+    ctx.lineTo(x - 15, y + 6);
+    ctx.lineTo(x - 12, y);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
@@ -1645,7 +1646,7 @@
     var frame = attack
       ? Math.min(5, Math.floor((0.5 - t.attackAnim) * 12))
       : Math.floor(this.time * 6 + t.id) % 4;
-    var size = 48;
+    var size = 40;
     var feet = baseY - th * 0.12;
     var uy = feet - size * 0.8125;
     ctx.save();
@@ -2027,8 +2028,8 @@
       ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
       if (ok) {
         var A = TD.Assets;
-        var tw = 70;
-        var th = 130;
+        var tw = 56;
+        var th = 104;
         var baseY = center.y + cell * 0.55;
         ctx.globalAlpha = 0.7;
         if (A && A.has('towerIdle1')) {

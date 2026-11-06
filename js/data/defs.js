@@ -7,9 +7,9 @@
   TD.Config = {
     cols: 28,
     rows: 17,
-    cell: 56,
-    width: 1568,
-    height: 952,
+    cell: 52,
+    width: 1456,
+    height: 884,
 
     startGold: 360,
     startLives: 20,

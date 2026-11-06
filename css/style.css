@@ -67,8 +67,8 @@ body.has-screen {
 
 .stage {
   position: relative;
-  width: 1568px;
-  height: 952px;
+  width: 1456px;
+  height: 884px;
   flex: 0 0 auto;
   border: 2px solid #6f8fb5;
   outline: 3px solid #1a2b40;
@@ -79,8 +79,8 @@ body.has-screen {
 
 #game {
   display: block;
-  width: 1568px;
-  height: 952px;
+  width: 1456px;
+  height: 884px;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   cursor: crosshair;
@@ -89,8 +89,8 @@ body.has-screen {
 /* ================= панель ================= */
 
 .hud {
-  width: 320px;
-  flex: 0 0 320px;
+  width: 340px;
+  flex: 0 0 340px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -113,7 +113,7 @@ body.has-screen {
 }
 
 .hud__level {
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: #9ff0a6;
@@ -123,14 +123,14 @@ body.has-screen {
 }
 
 .hud__wave {
-  font-size: 15px;
+  font-size: 17px;
   color: var(--muted);
   letter-spacing: 0.5px;
 }
 
 .hud__wave b {
   color: var(--text);
-  font-size: 20px;
+  font-size: 22px;
 }
 
 .wavebar {
@@ -168,19 +168,19 @@ body.has-screen {
 }
 
 .stat__ico {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1;
 }
 
 .stat__val {
-  font-size: 19px;
+  font-size: 21px;
   font-weight: bold;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
 
 .stat__lbl {
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--muted);
@@ -209,7 +209,7 @@ body.has-screen {
   background: linear-gradient(180deg, #334b6d, #2a3f5d);
   color: var(--text);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 13.5px;
   letter-spacing: 0.6px;
   text-transform: uppercase;
   padding: 8px 10px;
@@ -266,7 +266,7 @@ body.has-screen {
 .btn--big {
   width: 100%;
   padding: 12px 14px;
-  font-size: 14px;
+  font-size: 15.5px;
   letter-spacing: 1.5px;
 }
 
@@ -316,7 +316,7 @@ body.has-screen {
 
 .hud__title {
   margin: 2px 0 0;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--muted);
@@ -397,7 +397,7 @@ body.has-screen {
 }
 
 .shop__name {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: bold;
   letter-spacing: 0.4px;
   white-space: nowrap;
@@ -416,7 +416,7 @@ body.has-screen {
 }
 
 .shop__price {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--gold);
   font-variant-numeric: tabular-nums;
 }
@@ -438,7 +438,7 @@ body.has-screen {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: bold;
   color: #b8f5bd;
   letter-spacing: 0.5px;
@@ -472,7 +472,7 @@ body.has-screen {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  font-size: 11.5px;
+  font-size: 13px;
   padding-bottom: 2px;
   border-bottom: 1px dashed rgba(42, 51, 70, 0.55);
 }
@@ -490,7 +490,7 @@ body.has-screen {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11.5px;
+  font-size: 13px;
 }
 
 .inspector__lbl {
@@ -505,7 +505,7 @@ body.has-screen {
 .inspector__actions .btn {
   flex: 1 1 50%;
   padding: 6px 6px;
-  font-size: 10.5px;
+  font-size: 12px;
   text-transform: none;
   letter-spacing: 0;
 }
@@ -525,7 +525,7 @@ body.has-screen {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--muted);
   cursor: pointer;
   user-select: none;
@@ -736,7 +736,7 @@ body.has-screen {
 
 .menu-kicker {
   margin: 0 0 12px;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 2.4px;
   text-transform: uppercase;
   color: var(--gold);
@@ -744,7 +744,7 @@ body.has-screen {
 
 .menu-credit {
   margin: 14px 0 0;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.5px;
   color: var(--muted);
   opacity: 0.8;
@@ -802,7 +802,7 @@ body.has-screen {
 
 .tagline {
   margin: 0 0 26px;
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 1.6px;
   text-transform: uppercase;
   color: var(--muted);
@@ -819,7 +819,7 @@ body.has-screen {
 
 .hint {
   margin: 20px 0 0;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--muted);
 }
 
