@@ -17,10 +17,10 @@
   function allowedTypes(wave) {
     var t = ['slime'];
     if (wave >= 2) t.push('runner');
-    if (wave >= 4) t.push('swarm');
-    if (wave >= 5) t.push('brute');
-    if (wave >= 6) t.push('flyer');
-    if (wave >= 8) t.push('shield');
+    if (wave >= 3) t.push('swarm');
+    if (wave >= 4) t.push('brute');
+    if (wave >= 5) t.push('flyer');
+    if (wave >= 7) t.push('shield');
     return t;
   }
 
@@ -59,15 +59,15 @@
     var seed = TD.hash('pd:lvl' + levelIndex + ':wave' + wave + ':v2');
     var rand = TD.rng(seed);
 
-    var isBoss = (wave === 10 || wave === 20);
-    var budget = 7 + wave * 3.6 + levelIndex * 1.2;
+    var isBoss = (wave === Math.ceil(TD.Config.waveCount / 2) || wave === TD.Config.waveCount);
+    var budget = 8 + wave * 4.2 + levelIndex * 1.2;
     if (isBoss) budget *= 0.65;
 
     /* Ранние волны короткие: иначе на сложных картах новичок не успевает
        построить оборону. Дальше ограничение не мешает. */
     var cap = isBoss ? 100 : (wave <= 2 ? 8 : (wave <= 3 ? 11 : (wave <= 4 ? 14 : 140)));
 
-    var groupCount = TD.clamp(2 + Math.floor(wave / 6), 2, 4);
+    var groupCount = TD.clamp(2 + Math.floor(wave / 4), 2, 4);
     var types = allowedTypes(wave);
     var groups = [];
     var spawns = [];
@@ -121,7 +121,7 @@
     };
   }
 
-  /** Все волны уровня (по умолчанию 20). */
+  /** Все волны уровня (по умолчанию TD.Config.waveCount). */
   TD.buildWaves = function (levelIndex, count) {
     var n = count || TD.Config.waveCount;
     var out = [];

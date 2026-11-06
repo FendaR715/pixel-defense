@@ -134,6 +134,8 @@
         var r = p.r + dirs[d][1];
         if (!this.grid.buildable(c, r)) continue;
         if (this.onPath(c, r)) continue;
+        /* не ставим башню вплотную к краю — иначе её срезает canvas */
+        if (c < 1 || r < 1 || c > this.grid.cols - 2 || r > this.grid.rows - 2) continue;
         var key = c + ',' + r;
         if (seen[key]) continue;
         seen[key] = true;
@@ -1737,19 +1739,6 @@
           ctx.restore();
           drawn = true;
 
-          if (e.def.shield) {
-            var sx = e.x - animSize * 0.34;
-            var sy = e.y - animSize * 0.16 + bob;
-            ctx.save();
-            ctx.fillStyle = '#3f7fd0';
-            ctx.strokeStyle = '#ffd166';
-            ctx.lineWidth = 2 * k;
-            ctx.beginPath();
-            ctx.arc(sx, sy, animSize * 0.18, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-            ctx.restore();
-          }
           if (e.def.crown) {
             ctx.save();
             ctx.fillStyle = '#ffd166';

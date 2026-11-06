@@ -12,7 +12,7 @@
 
 ```bash
 node tests/run.js          # 32 юнит-теста логики, ассетов и площадок
-node tools/balance.js      # симуляция баланса: все 3 карты проходятся
+node tools/balance.js      # симуляция баланса: все 6 карт проходятся
 node tools/ui-check.js     # 31 проверка интерфейса в headless-браузере
 ```
 

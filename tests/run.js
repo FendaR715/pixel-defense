@@ -140,8 +140,8 @@ test('assets: все три набора на месте, PNG читаются',
 
 /* ---------- карты и путь ---------- */
 
-test('maps: 3 карты 24×15 с порталом и сердцем', () => {
-  assertEqual(TD.Maps.length, 3);
+test('maps: 6 карт 28×17 с порталом и сердцем', () => {
+  assertEqual(TD.Maps.length, 6);
   const seen = {};
   TD.Maps.forEach((map, index) => {
     assertEqual(map.ascii.length, TD.Config.rows, map.name + ': строк');
@@ -154,7 +154,7 @@ test('maps: 3 карты 24×15 с порталом и сердцем', () => {
     seen[map.id] = true;
     assert(map.name && map.desc, 'у карты нет имени/описания');
   });
-  assertEqual(Object.keys(seen).length, 3);
+  assertEqual(Object.keys(seen).length, 6);
 });
 
 test('grid: A* находит путь на всех картах, шаги по 4 направлениям', () => {
@@ -276,10 +276,10 @@ test('enemies: все типы описаны и имеют спрайты', () 
 
 /* ---------- волны ---------- */
 
-test('waves: 20 волн генерируются для каждого уровня', () => {
+test('waves: 12 волн генерируются для каждого уровня', () => {
   for (let level = 0; level < TD.Maps.length; level++) {
     const waves = TD.buildWaves(level, TD.Config.waveCount);
-    assertEqual(waves.length, 20, 'уровень ' + level + ': число волн');
+    assertEqual(waves.length, TD.Config.waveCount, 'уровень ' + level + ': число волн');
     waves.forEach((w, i) => {
       assertEqual(w.number, i + 1);
       assert(w.spawns.length > 0, 'волна ' + (i + 1) + ': нет врагов');
@@ -305,14 +305,14 @@ test('waves: состав детерминирован', () => {
   }
 });
 
-test('waves: боссы только на 10-й и 20-й волнах', () => {
+test('waves: боссы на 6-й и 12-й волнах', () => {
   const waves = TD.buildWaves(0);
   const bossWaves = waves.filter((w) => w.boss).map((w) => w.number);
-  assertDeepEqual(bossWaves, [10, 20], 'босс-волны');
-  const tenth = waves[9].spawns.filter((s) => s.type === 'boss');
-  const twentieth = waves[19].spawns.filter((s) => s.type === 'boss');
-  assertEqual(tenth.length, 1, 'на 10-й волне один босс');
-  assertEqual(twentieth.length, 1, 'на 20-й волне один босс');
+  assertDeepEqual(bossWaves, [6, 12], 'босс-волны');
+  const sixth = waves[5].spawns.filter((s) => s.type === 'boss');
+  const twelfth = waves[11].spawns.filter((s) => s.type === 'boss');
+  assertEqual(sixth.length, 1, 'на 6-й волне один босс');
+  assertEqual(twelfth.length, 1, 'на 12-й волне один босс');
 });
 
 /* ---------- игра ---------- */
@@ -360,7 +360,7 @@ test('game: стартовые ресурсы', () => {
   assertEqual(g.lives, TD.Config.startLives);
   assertEqual(g.wave, 0);
   assertEqual(g.state, 'idle');
-  assertEqual(g.waves.length, 20);
+  assertEqual(g.waves.length, TD.Config.waveCount);
   assert(g.canStartWave(), 'первая волна должна быть доступна');
 });
 
@@ -502,11 +502,11 @@ test('game: поражение при нуле жизней', () => {
   assertEqual(g.summary().win, false);
 });
 
-test('game: победа после двадцатой волны', () => {
+test('game: победа после последней волны', () => {
   const g = new TD.Game(0);
   let endEvent = null;
   g.onEvent = (type, data) => { if (type === 'end') endEvent = data; };
-  g.wave = 20;
+  g.wave = TD.Config.waveCount;
   g.state = 'wave';
   g.spawns = [];
   g.spawnIndex = 0;

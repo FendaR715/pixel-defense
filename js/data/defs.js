@@ -5,18 +5,18 @@
   var TD = root.TD = root.TD || {};
 
   TD.Config = {
-    cols: 24,
-    rows: 15,
+    cols: 28,
+    rows: 17,
     cell: 56,
-    width: 1344,
-    height: 840,
+    width: 1568,
+    height: 952,
 
-    startGold: 450,
+    startGold: 360,
     startLives: 20,
-    waveCount: 20,
+    waveCount: 12,
 
     /* Фиксированные площадки под башни: ограничивают спам и держат баланс. */
-    buildSpots: 15,
+    buildSpots: 18,
 
     maxTowerLevel: 3,
     upgradeDamage: 0.25,
@@ -24,7 +24,7 @@
     upgradeCostRate: 0.8,
     sellRate: 0.6,
 
-    hpScalePerWave: 0.10,
+    hpScalePerWave: 0.16,
     hpScalePerLevel: 0.10,
 
     earlyBonusBase: 10,
@@ -162,7 +162,7 @@
       id: 'shield', name: 'Щитоносец', sprite: 'enemy_shield',
       hp: 120, speed: 0.9, armor: 6, gold: 14, points: 35, lives: 1,
       color: '#72b8ff',
-      anim: 'e2', animScale: 2.0, animTint: 'hue-rotate(165deg) saturate(1.15)', shield: true,
+      anim: 'e2', animScale: 2.0, animTint: 'hue-rotate(165deg) saturate(1.15)',
       desc: 'Стальной щит: высокая броня. Снайпер её игнорирует.'
     },
     flyer: {

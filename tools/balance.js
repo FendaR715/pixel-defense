@@ -152,7 +152,7 @@ for (let i = 0; i < TD.Maps.length; i++) {
   allWin = allWin && result.win;
   console.log('');
   console.log(result.name + ': ' + (result.win ? 'ПОБЕДА' : 'ПОРАЖЕНИЕ') +
-    ' | волн ' + result.wave + '/20 | жизней ' + result.lives +
+    ' | волн ' + result.wave + '/' + TD.Config.waveCount + ' | жизней ' + result.lives +
     ' | башен ' + result.towers + ' | очки ' + result.score +
     ' | время ' + result.time + 'с');
   console.log('');
