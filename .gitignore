@@ -15,11 +15,6 @@ tmp/
 .chrome-prof/
 .edge-prof/
 
-# сторонние ассеты CraftPix — не публикуются в репозитории (см. README)
-free-archer-towers-pixel-art-for-tower-defense/
-free-field-enemies-pixel-art-for-tower-defense/
-free-fields-tileset-pixel-art-for-tower-defense/
-
 # редакторы
 .vscode/
 .idea/

@@ -2,7 +2,7 @@
 
 1. **Запуск:** откройте `index.html` в браузере (Chrome, Edge, Firefox) — игра готова,
    ничего устанавливать не нужно. Ассеты поля лежат в папке
-   `free-fields-tileset-pixel-art-for-tower-defense` рядом с `index.html`.
+   `assets/free-fields-tileset-pixel-art-for-tower-defense`.
 2. **`docs/HANDOFF.md`** — главный документ: архитектура, баланс, что сделано,
    тесты и что осталось (только push в git).
 3. **`README.md`** — описание проекта, скриншоты, структура и команды проверки.

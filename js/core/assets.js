@@ -1,5 +1,5 @@
 /* Пиксельная Оборона — загрузка внешних ассетов.
-   Набор free-fields-tileset-pixel-art-for-tower-defense (CraftPix).
+   Набор free-fields-tileset-pixel-art-for-tower-defense (CraftPix), папка assets/.
    Все картинки грузятся локально относительно index.html, поэтому игра
    продолжает работать по file:// без сервера. Пока ассет не загрузился,
    рендер использует процедурный фолбэк. */
@@ -8,9 +8,9 @@
 
   var TD = root.TD = root.TD || {};
 
-  var BASE = 'free-fields-tileset-pixel-art-for-tower-defense/';
-  var TOWER_BASE = 'free-archer-towers-pixel-art-for-tower-defense/';
-  var ENEMY_BASE = 'free-field-enemies-pixel-art-for-tower-defense/';
+  var BASE = 'assets/free-fields-tileset-pixel-art-for-tower-defense/';
+  var TOWER_BASE = 'assets/free-archer-towers-pixel-art-for-tower-defense/';
+  var ENEMY_BASE = 'assets/free-field-enemies-pixel-art-for-tower-defense/';
   var TILE = 32;
 
   /* key → путь внутри набора */

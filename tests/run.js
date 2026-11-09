@@ -102,9 +102,9 @@ test('sprites: все описания 16×16 и с полной палитро�
 });
 
 test('assets: все три набора на месте, PNG читаются', () => {
-  const base = path.join(ROOT, 'free-fields-tileset-pixel-art-for-tower-defense');
-  const towerBase = path.join(ROOT, 'free-archer-towers-pixel-art-for-tower-defense');
-  const enemyBase = path.join(ROOT, 'free-field-enemies-pixel-art-for-tower-defense');
+  const base = path.join(ROOT, TD.Assets.BASE);
+  const towerBase = path.join(ROOT, TD.Assets.TOWER_BASE);
+  const enemyBase = path.join(ROOT, TD.Assets.ENEMY_BASE);
 
   function checkFiles(files, root, label) {
     const names = Object.keys(files);

@@ -83,10 +83,10 @@ js/logic/grid.js      сетка, A*, проверка «путь не пере�
 js/game.js            игровой цикл, башни, враги, снаряды, отрисовка
 js/ui.js              экраны, HUD, магазин, инспектор, сохранения, бестиарий
 js/main.js            точка входа
-# сторонние ассеты CraftPix: только локально, в репозиторий не входят
-free-fields-tileset-pixel-art-for-tower-defense/  поле и объекты
-free-archer-towers-pixel-art-for-tower-defense/   анимации башни и лучника
-free-field-enemies-pixel-art-for-tower-defense/   анимации монстров
+assets/               сторонние наборы CraftPix (поле, башня, монстры)
+  free-fields-tileset-pixel-art-for-tower-defense/  поле и объекты
+  free-archer-towers-pixel-art-for-tower-defense/   анимации башни и лучника
+  free-field-enemies-pixel-art-for-tower-defense/   анимации монстров
 tests/run.js          юнит-тесты логики (Node)
 tools/balance.js      симуляция баланса: бот проходит все карты
 tools/ui-check.js     проверка интерфейса в headless-браузере
@@ -172,10 +172,9 @@ index.html?test=1&level=0&wave=1&ff=300&demo=1&path=1
 **Free Archer Towers Pixel Art for Tower Defense** (башня, апгрейды, лучник) и
 **Free Field Enemies Pixel Art for Tower Defense** (монстры: ходьба, смерть, атака).
 Условия — в `License.txt` каждой папки
-(https://craftpix.net/file-licenses/). Лицензия не разрешает публиковать эти файлы
-как отдельные ассеты, поэтому **в репозиторий они не входят** — папки перечислены в
-`.gitignore`. Чтобы запустить игру, положите три набора CraftPix рядом с `index.html`;
-в остальном игра не обращается в интернет.
+(https://craftpix.net/file-licenses/). Это Freebie-наборы: их разрешено использовать
+в игре, в том числе коммерческой, но нельзя перепродавать или распространять как
+самостоятельные исходники. Папки лежат в `assets/`, игра не обращается в интернет.
 
 ## Статус
 

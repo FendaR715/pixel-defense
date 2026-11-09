@@ -64,9 +64,10 @@ js/logic/grid.js      — сетка, A*, проверка «путь не пе�
 js/game.js            — класс Game: состояние, update(dt), render(ctx), ввод
 js/ui.js              — экраны, HUD, магазин, инспектор, сохранения, бестиарий
 js/main.js            — бутстрап и отладочный автозапуск
-free-fields-tileset-pixel-art-for-tower-defense/ — поле и объекты (CraftPix)
-free-archer-towers-pixel-art-for-tower-defense/  — башня, апгрейды, лучник
-free-field-enemies-pixel-art-for-tower-defense/  — анимации монстров
+assets/                                            — сторонние наборы CraftPix
+  free-fields-tileset-pixel-art-for-tower-defense/ — поле и объекты (CraftPix)
+  free-archer-towers-pixel-art-for-tower-defense/  — башня, апгрейды, лучник
+  free-field-enemies-pixel-art-for-tower-defense/  — анимации монстров
 tests/run.js          — 32 теста логики на Node (без браузера)
 tools/balance.js      — симуляция баланса ботом
 tools/ui-check.js     — проверка интерфейса через DevTools Protocol
