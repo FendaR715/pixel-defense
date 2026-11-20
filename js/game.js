@@ -52,9 +52,8 @@
 
     this.time = 0;
     this.elapsed = 0;
-    this.waveTime = 0;
-    this.spawns = [];
-    this.spawnIndex = 0;
+    /* Волны можно запускать внахлёст: у каждой свой прогресс спавна и свои враги. */
+    this.activeWaves = [];
     this.waveTotal = 0;
     this.waveResolved = 0;
     this.waveKilled = 0;
@@ -259,38 +258,76 @@
 
   /* ================= волны ================= */
 
+  /** Волну можно запустить, пока предыдущая ещё идёт — за это дают золото. */
   Game.prototype.canStartWave = function () {
-    return !this.finished && this.state === 'idle' && this.wave < this.waves.length;
+    return !this.finished && this.wave < this.waves.length;
   };
 
   Game.prototype.nextWaveNumber = function () {
     return Math.min(this.wave + 1, this.waves.length);
   };
 
+  /** Идёт ли сейчас хотя бы одна волна. */
+  Game.prototype.wavesInProgress = function () {
+    return this.activeWaves.length > 0;
+  };
+
+  /** Суммарный прогресс всех активных волн — для полосы в HUD. */
+  Game.prototype.waveProgress = function () {
+    var total = 0;
+    var resolved = 0;
+    for (var i = 0; i < this.activeWaves.length; i++) {
+      total += this.activeWaves[i].total;
+      resolved += this.activeWaves[i].resolved;
+    }
+    return { total: total, resolved: resolved };
+  };
+
+  Game.prototype.syncWaveProgress = function () {
+    var p = this.waveProgress();
+    this.waveTotal = p.total;
+    this.waveResolved = p.resolved;
+  };
+
+  /** Бонус за запуск волны во время боя: только если уже идёт другая волна. */
+  Game.prototype.earlyWaveBonus = function (waveNumber) {
+    if (!this.wavesInProgress()) return 0;
+    return C.earlyBonusBase + C.earlyBonusPerWave * waveNumber;
+  };
+
   Game.prototype.startWave = function () {
     if (!this.canStartWave()) return false;
     var next = this.wave + 1;
-    var earlyBonus = 0;
-    if (this.wave > 0) {
-      earlyBonus = C.earlyBonusBase + C.earlyBonusPerWave * next;
-      this.gold += earlyBonus;
-    }
+    var overlapping = this.wavesInProgress();
+    var earlyBonus = this.earlyWaveBonus(next);
+    this.gold += earlyBonus;
+
     var w = this.waves[next - 1];
+    var track = {
+      wave: next,
+      label: w.label,
+      spawns: w.spawns,
+      spawnIndex: 0,
+      time: 0,
+      total: w.total,
+      resolved: 0,
+      killed: 0,
+      alive: 0,
+      reward: w.reward,
+      boss: w.boss
+    };
+    this.activeWaves.push(track);
     this.wave = next;
     this.state = 'wave';
-    this.spawns = w.spawns;
-    this.spawnIndex = 0;
-    this.waveTime = 0;
-    this.waveTotal = w.total;
-    this.waveResolved = 0;
-    this.waveKilled = 0;
     this.waveLabel = w.label;
+    this.syncWaveProgress();
     this.emit('wave-start', {
       wave: next,
       label: w.label,
       total: w.total,
       boss: w.boss,
-      earlyBonus: earlyBonus
+      earlyBonus: earlyBonus,
+      overlapping: overlapping
     });
     this.emit('banner', {
       title: w.boss ? 'ВОЛНА ' + next + ' — БОСС' : 'Волна ' + next,
@@ -300,23 +337,46 @@
     return true;
   };
 
+  /* Одна или несколько волн могут завершиться в один кадр (например, если
+     последние враги умирают вместе). Награды выдаём по порядку номеров. */
   Game.prototype.checkWaveDone = function () {
-    if (this.state !== 'wave' || this.finished) return;
-    if (this.spawnIndex < this.spawns.length || this.enemies.length > 0) return;
-    var w = this.waves[this.wave - 1];
-    this.gold += w.reward;
-    this.score += 30 * this.wave;
-    this.state = 'idle';
-    this.emit('wave-clear', { wave: this.wave, reward: w.reward, last: this.wave >= this.waves.length });
-    if (this.wave >= this.waves.length) {
+    if (this.finished) return;
+    var cleared = [];
+    for (var i = this.activeWaves.length - 1; i >= 0; i--) {
+      var tr = this.activeWaves[i];
+      if (tr.spawnIndex < tr.spawns.length || tr.alive > 0) continue;
+      cleared.push(tr);
+      this.activeWaves.splice(i, 1);
+    }
+    if (!cleared.length) {
+      this.syncWaveProgress();
+      return;
+    }
+    cleared.sort(function (a, b) { return a.wave - b.wave; });
+    for (var j = 0; j < cleared.length; j++) {
+      var done = cleared[j];
+      this.gold += done.reward;
+      this.score += 30 * done.wave;
+      this.emit('wave-clear', {
+        wave: done.wave,
+        reward: done.reward,
+        last: done.wave >= this.waves.length
+      });
+    }
+    this.syncWaveProgress();
+    if (this.activeWaves.length === 0 && this.wave >= this.waves.length) {
       this.win();
       return;
     }
+    this.state = this.activeWaves.length ? 'wave' : 'idle';
     this.sound('upgrade');
-    this.emit('banner', {
-      title: 'Волна ' + this.wave + ' пройдена',
-      sub: '+' + w.reward + ' золота · Следующая волна: ' + this.waves[this.wave].label
-    });
+    var last = cleared[cleared.length - 1];
+    if (last.wave < this.waves.length) {
+      this.emit('banner', {
+        title: 'Волна ' + last.wave + ' пройдена',
+        sub: '+' + last.reward + ' золота · Следующая волна: ' + this.waves[last.wave].label
+      });
+    }
   };
 
   /* ================= башни ================= */
@@ -468,7 +528,9 @@
     var def = TD.EnemyDefs[type];
     if (!def) return null;
     opts = opts || {};
-    var scale = TD.enemyHpScale(this.wave || 1, this.levelIndex);
+    var waveNum = opts.wave != null ? opts.wave : (this.wave || 1);
+    var track = opts.track || null;
+    var scale = TD.enemyHpScale(waveNum, this.levelIndex);
     var hp = opts.hp != null ? opts.hp : def.hp * scale;
     var startPixel = this.grid.cellCenter(this.grid.spawn.c, this.grid.spawn.r);
     var x = opts.x != null ? opts.x : startPixel.x;
@@ -478,6 +540,8 @@
       id: this.nextId++,
       type: type,
       def: def,
+      wave: waveNum,
+      track: track,
       hp: hp,
       maxHp: hp,
       speed: def.speed * C.cell,
@@ -529,6 +593,7 @@
     }
 
     this.enemies.push(e);
+    if (track) track.alive += 1;
     return e;
   };
 
@@ -547,6 +612,15 @@
     return dmg;
   };
 
+  /** Учитывает врага в прогресс его волны (убит или прорвался). */
+  Game.prototype.trackEnemyGone = function (e, killed) {
+    var tr = e && e.track;
+    if (!tr) return;
+    if (tr.alive > 0) tr.alive -= 1;
+    tr.resolved += 1;
+    if (killed) tr.killed += 1;
+  };
+
   Game.prototype.killEnemy = function (e) {
     if (e.dead) return;
     e.dead = true;
@@ -555,7 +629,7 @@
     this.score += e.def.points;
     this.kills += 1;
     this.waveKilled += 1;
-    this.waveResolved += 1;
+    this.trackEnemyGone(e, true);
     this.floatText(e.x, e.y - 12, '+' + e.def.gold, '#f2c14e');
     this.burst(e.x, e.y, e.def.color, e.boss ? 30 : 10);
     this.sound(e.boss ? 'explode' : 'kill');
@@ -573,7 +647,12 @@
       this.addEffect({ type: 'boom', x: e.x, y: e.y, radius: 90, color: '#ef476f', dur: 0.5 });
       for (var i = 0; i < 3; i++) {
         var a = (Math.PI * 2 / 3) * i + 0.4;
-        this.spawnEnemy('brute', { x: e.x + Math.cos(a) * 14, y: e.y + Math.sin(a) * 14 });
+        this.spawnEnemy('brute', {
+          x: e.x + Math.cos(a) * 14,
+          y: e.y + Math.sin(a) * 14,
+          wave: e.wave,
+          track: e.track
+        });
       }
     }
   };
@@ -584,7 +663,7 @@
     this.removeEnemy(e);
     this.lives -= e.lives || 1;
     this.leaks += 1;
-    this.waveResolved += 1;
+    this.trackEnemyGone(e, false);
     var base = this.grid.cellCenter(this.grid.base.c, this.grid.base.r);
     this.addEffect({ type: 'boom', x: base.x, y: base.y, radius: 60, color: '#ef476f', dur: 0.4 });
     this.burst(base.x, base.y, '#ef476f', 12);
@@ -822,11 +901,18 @@
     this.time += dt;
     this.elapsed += dt;
 
-    if (this.state === 'wave') {
-      this.waveTime += dt;
-      while (this.spawnIndex < this.spawns.length && this.spawns[this.spawnIndex].t <= this.waveTime) {
-        this.spawnEnemy(this.spawns[this.spawnIndex].type);
-        this.spawnIndex += 1;
+    if (this.activeWaves.length) {
+      for (var wi = 0; wi < this.activeWaves.length; wi++) {
+        var track = this.activeWaves[wi];
+        track.time += dt;
+        while (track.spawnIndex < track.spawns.length &&
+               track.spawns[track.spawnIndex].t <= track.time) {
+          this.spawnEnemy(track.spawns[track.spawnIndex].type, {
+            wave: track.wave,
+            track: track
+          });
+          track.spawnIndex += 1;
+        }
       }
     }
 
@@ -843,7 +929,8 @@
     this.updateProjectiles(dt);
     this.updateEffects(dt);
 
-    if (this.state === 'wave') this.checkWaveDone();
+    this.syncWaveProgress();
+    if (this.activeWaves.length || this.state === 'wave') this.checkWaveDone();
     if (this.lives <= 0 && !this.finished) {
       this.lives = 0;
       this.lose();
@@ -1945,18 +2032,24 @@
     return this.towerAtPoint(this.pointer.x, this.pointer.y);
   };
 
+  Game.prototype.enemyTooltipLines = function (e) {
+    var lines = [e.def.name];
+    lines.push('HP ' + Math.ceil(e.hp) + ' / ' + Math.ceil(e.maxHp));
+    lines.push('при прорыве: −' + (e.lives || 1) + ' ♥');
+    var tags = [];
+    if (e.def.armor) tags.push('броня ' + e.def.armor);
+    if (e.flying) tags.push('летает');
+    if (e.boss) tags.push('босс');
+    if (tags.length) lines.push(tags.join(' · '));
+    return lines;
+  };
+
   Game.prototype.drawTooltips = function (ctx) {
     if (!this.pointer.active) return;
     var e = this.pointerEnemy();
     if (e) {
-      var lines = [e.def.name];
-      lines.push('HP ' + Math.ceil(e.hp) + ' / ' + Math.ceil(e.maxHp));
-      var tags = [];
-      if (e.def.armor) tags.push('броня ' + e.def.armor);
-      if (e.flying) tags.push('летает');
-      if (e.boss) tags.push('босс');
-      if (tags.length) lines.push(tags.join(' · '));
-      this.drawTooltip(ctx, e.x, e.y - (e.boss ? this.grid.cell * 0.9 : this.grid.cell * 0.65), lines, e.def.color);
+      this.drawTooltip(ctx, e.x, e.y - (e.boss ? this.grid.cell * 0.9 : this.grid.cell * 0.65),
+        this.enemyTooltipLines(e), e.def.color);
       return;
     }
     var t = this.pointerTower();
@@ -2001,7 +2094,10 @@
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     for (i = 0; i < lines.length; i++) {
-      ctx.fillStyle = i === 0 ? '#ffffff' : (i === 1 ? '#dceaff' : '#a9c0da');
+      if (i === 0) ctx.fillStyle = '#ffffff';
+      else if (lines[i].indexOf('при прорыве') === 0) ctx.fillStyle = '#ff9aa8';
+      else if (i === 1) ctx.fillStyle = '#dceaff';
+      else ctx.fillStyle = '#a9c0da';
       ctx.fillText(lines[i], x + 10 * k, y + 5 * k + lineH * (i + 0.5));
     }
     ctx.restore();

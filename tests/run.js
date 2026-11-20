@@ -477,18 +477,63 @@ test('game: волна запускается, враги доходят до с
   assert(g.gold >= 0, 'золото отрицательное');
 });
 
-test('game: досрочный запуск второй волны даёт бонус', () => {
+test('game: запуск волны во время боя даёт бонус, из простоя — нет', () => {
+  const g = new TD.Game(0);
+  const gold0 = g.gold;
+  assert(g.startWave(), 'первая волна не запустилась');
+  assertEqual(g.gold, gold0, 'за первую волну бонус не положен');
+
+  const gold1 = g.gold;
+  assert(g.startWave(), 'вторую волну нельзя запустить во время первой');
+  assertEqual(g.wave, 2);
+  assertEqual(g.activeWaves.length, 2, 'должны идти две волны одновременно');
+  assert(g.gold > gold1, 'бонус за запуск во время боя не начислен');
+
+  /* Завершаем обе волны — из простоя следующая запускается без бонуса. */
+  g.activeWaves.forEach((tr) => { tr.spawnIndex = tr.spawns.length; tr.alive = 0; });
+  g.checkWaveDone();
+  assertEqual(g.state, 'idle', 'волны не завершились');
+  const gold2 = g.gold;
+  assert(g.startWave());
+  assertEqual(g.gold, gold2, 'бонус начислили без идущей волны');
+});
+
+test('game: во время боя спавнятся враги обеих волн', () => {
   const g = new TD.Game(0);
   g.startWave();
-  g.enemies = [];
-  g.spawnIndex = g.spawns.length;
-  g.checkWaveDone();
-  assertEqual(g.state, 'idle', 'волна не завершилась');
-  assertEqual(g.wave, 1);
-  const goldBefore = g.gold;
   g.startWave();
-  assertEqual(g.wave, 2);
-  assert(g.gold > goldBefore, 'бонус за досрочный запуск не начислен');
+  for (let i = 0; i < 30 * 3; i++) g.step(1 / 30);
+  const first = g.enemies.filter((e) => e.wave === 1).length;
+  const second = g.enemies.filter((e) => e.wave === 2).length;
+  assert(first > 0, 'нет врагов первой волны');
+  assert(second > 0, 'нет врагов второй волны');
+  assertEqual(g.state, 'wave');
+});
+
+test('game: волны завершаются независимо, победа — после всех', () => {
+  const g = new TD.Game(0);
+  g.wave = 10;
+  g.startWave();
+  g.startWave();
+  const w11 = g.activeWaves[0];
+  const w12 = g.activeWaves[1];
+  assertEqual(w11.wave, 11);
+  assertEqual(w12.wave, 12);
+  const goldBefore = g.gold;
+
+  /* Финальная волна закрыта первой — игра ещё не выиграна. */
+  w12.spawnIndex = w12.spawns.length;
+  w12.alive = 0;
+  g.checkWaveDone();
+  assert(!g.finished, 'победа сработала, пока идёт 11-я волна');
+  assertEqual(g.state, 'wave');
+  assertEqual(g.activeWaves.length, 1);
+  assert(g.gold > goldBefore, 'награда за 12-ю волну не начислена');
+
+  w11.spawnIndex = w11.spawns.length;
+  w11.alive = 0;
+  g.checkWaveDone();
+  assert(g.finished && g.result === 'win', 'победа не сработала после всех волн');
 });
 
 test('game: поражение при нуле жизней', () => {
@@ -506,11 +551,12 @@ test('game: победа после последней волны', () => {
   const g = new TD.Game(0);
   let endEvent = null;
   g.onEvent = (type, data) => { if (type === 'end') endEvent = data; };
-  g.wave = TD.Config.waveCount;
-  g.state = 'wave';
-  g.spawns = [];
-  g.spawnIndex = 0;
-  g.enemies = [];
+  g.wave = TD.Config.waveCount - 1;
+  assert(g.startWave(), 'последняя волна не запустилась');
+  assertEqual(g.wave, TD.Config.waveCount);
+  const tr = g.activeWaves[0];
+  tr.spawnIndex = tr.spawns.length;
+  tr.alive = 0;
   g.checkWaveDone();
   assert(g.finished, 'победа не сработала');
   assertEqual(g.result, 'win');
@@ -540,6 +586,22 @@ test('game: босс при смерти делится на трёх громи
   g.damageEnemy(boss, 1e9, { pierceArmor: true });
   const brutesAfter = g.enemies.filter((e) => e.type === 'brute').length;
   assertEqual(brutesAfter - brutesBefore, 3, 'босс должен делиться на 3 громил');
+});
+
+test('game: подсказка врага показывает урон по жизням', () => {
+  const g = new TD.Game(0);
+  const slime = g.spawnEnemy('slime');
+  const slimeLines = g.enemyTooltipLines(slime);
+  assert(slimeLines.some((l) => l.indexOf('при прорыве: −1') === 0),
+    'для слизня нет строки о прорыве: ' + slimeLines.join(' | '));
+
+  g.setPointer(slime.x, slime.y);
+  assertEqual(g.pointerEnemy(), slime, 'курсор не находит врага');
+
+  const boss = g.spawnEnemy('boss');
+  const bossLines = g.enemyTooltipLines(boss);
+  assert(bossLines.some((l) => l.indexOf('при прорыве: −5') === 0),
+    'у босса должен быть урон 5 жизней: ' + bossLines.join(' | '));
 });
 
 test('game: update не падает и ускоряется без потери состояния', () => {

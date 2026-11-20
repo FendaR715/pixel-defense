@@ -141,6 +141,8 @@
     var ctx = null;
     var menuCtx = null;
     var menuTime = 0;
+    /* Камера поля: колесо мыши приближает карту вокруг курсора. */
+    var view = { zoom: 1, x: 0, y: 0 };
 
     /* ---------- DOM ---------- */
 
@@ -148,6 +150,7 @@
 
     function cacheDom() {
       els.canvas = $('game');
+      els.stage = document.querySelector('.stage');
       els.menuCanvas = $('menu-scene');
       els.toast = $('toast');
       els.banner = $('banner');
@@ -471,11 +474,14 @@
         els.next.disabled = !can;
         if (can) {
           var n = g.nextWaveNumber();
-          var bonus = g.wave > 0 ? TD.Config.earlyBonusBase + TD.Config.earlyBonusPerWave * n : 0;
+          var overlap = g.wavesInProgress();
+          var bonus = overlap ? TD.Config.earlyBonusBase + TD.Config.earlyBonusPerWave * n : 0;
           setText(els.next, 'Волна ' + n + ' ▸' + (bonus ? ' +' + bonus : ''));
-          els.next.title = 'Начать волну ' + n + (bonus ? ' досрочно (+' + bonus + ' золота)' : '') + ' (N)';
+          els.next.title = overlap
+            ? 'Запустить волну ' + n + ', пока идёт волна ' + g.wave + ': +' + bonus + ' золота (N)'
+            : 'Начать волну ' + n + ' (N)';
         } else {
-          setText(els.next, g.state === 'wave' ? 'Волна идёт' : 'Волна ▸');
+          setText(els.next, g.wave >= g.waves.length ? 'Все волны ▸' : 'Волна ▸');
         }
       }
 
@@ -512,6 +518,7 @@
       var g = new TD.Game(index);
       g.onEvent = handleGameEvent;
       state.game = g;
+      resetView();
       state.testMode = !!opts.test;
       applySettingsToGame(g);
       hideAllScreens();
@@ -823,7 +830,7 @@
       if (!g || g.finished) return;
       if (g.paused) return;
       if (!g.canStartWave()) {
-        if (g.state === 'wave') toast('Сначала закончите текущую волну');
+        if (g.wave >= g.waves.length) toast('Все волны уже запущены');
         return;
       }
       if (g.startWave()) {
@@ -905,6 +912,54 @@
       return { c: p.c, r: p.r };
     }
 
+    /* Ограничиваем сдвиг так, чтобы карта всегда закрывала сцену. */
+    function clampView() {
+      var stage = els.stage;
+      if (!stage) return;
+      var w = stage.clientWidth || TD.Config.width;
+      var h = stage.clientHeight || TD.Config.height;
+      view.x = TD.clamp(view.x, w - w * view.zoom, 0);
+      view.y = TD.clamp(view.y, h - h * view.zoom, 0);
+    }
+
+    function applyView() {
+      var canvas = els.canvas;
+      if (!canvas) return;
+      if (view.zoom === 1 && view.x === 0 && view.y === 0) {
+        canvas.style.transform = '';
+        return;
+      }
+      canvas.style.transform = 'translate(' + view.x.toFixed(2) + 'px,' +
+        view.y.toFixed(2) + 'px) scale(' + view.zoom.toFixed(4) + ')';
+    }
+
+    function resetView() {
+      view.zoom = 1;
+      view.x = 0;
+      view.y = 0;
+      applyView();
+    }
+
+    /** Приближение вокруг точки экрана: точка под курсором остаётся на месте. */
+    function zoomAt(clientX, clientY, factor) {
+      var stage = els.stage;
+      if (!stage) return;
+      var next = TD.clamp(view.zoom * factor, 1, 3);
+      if (Math.abs(next - view.zoom) < 0.001) return;
+      var rect = stage.getBoundingClientRect();
+      var w = stage.clientWidth || TD.Config.width;
+      var h = stage.clientHeight || TD.Config.height;
+      var px = (clientX - rect.left) * w / rect.width;
+      var py = (clientY - rect.top) * h / rect.height;
+      var sx = (px - view.x) / view.zoom;
+      var sy = (py - view.y) / view.zoom;
+      view.zoom = next;
+      view.x = px - sx * next;
+      view.y = py - sy * next;
+      clampView();
+      applyView();
+    }
+
     function bindEvents() {
       var canvas = els.canvas;
 
@@ -924,6 +979,20 @@
           state.game.clearPointer();
         }
       });
+
+      /* Колесо мыши — приближение карты вокруг курсора. */
+      if (els.stage) {
+        els.stage.addEventListener('wheel', function (e) {
+          var g = state.game;
+          if (!g || g.finished) return;
+          e.preventDefault();
+          var delta = e.deltaY;
+          if (e.deltaMode === 1) delta *= 16;
+          else if (e.deltaMode === 2) delta *= 100;
+          if (!delta) return;
+          zoomAt(e.clientX, e.clientY, Math.exp(-delta * 0.0016));
+        }, { passive: false });
+      }
 
       canvas.addEventListener('click', function (e) {
         var g = state.game;
@@ -1105,6 +1174,7 @@
           return;
         }
         if (key === 'n') { nextWave(); return; }
+        if (key === '0') { resetView(); return; }
         if (key === 'u') { upgradeSelected(); return; }
         if (key === 's') { sellSelected(); return; }
         if (key === 'p') { toggleSetting('path'); return; }

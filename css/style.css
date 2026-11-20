@@ -83,6 +83,8 @@ body.has-screen {
   height: 884px;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  transform-origin: 0 0;
+  will-change: transform;
   cursor: crosshair;
 }
 
@@ -540,6 +542,16 @@ body.has-screen {
 
 .check:hover {
   color: var(--text);
+}
+
+.check--static {
+  cursor: default;
+  font-size: 11.5px;
+  opacity: 0.85;
+}
+
+.check--static:hover {
+  color: var(--muted);
 }
 
 /* ================= баннер и тост ================= */

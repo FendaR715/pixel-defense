@@ -252,7 +252,46 @@ async function main() {
   await evalJS("document.dispatchEvent(new KeyboardEvent('keydown', {key:'n', bubbles:true}))");
   await sleep(200);
   check('волна запустилась по N', await evalJS('TD.UI.getGame().state') === 'wave');
-  check('кнопки волны заблокированы во время боя', await evalJS("document.getElementById('btn-next').disabled") === true);
+  check('кнопка волны доступна во время боя', await evalJS("document.getElementById('btn-next').disabled") === false);
+  const nextLabel = await evalJS("document.getElementById('btn-next').textContent");
+  check('кнопка показывает бонус за волну в бою', /\+/.test(nextLabel), nextLabel);
+
+  /* вторая волна запускается, пока идёт первая */
+  const goldBeforeOverlap = await evalJS('TD.UI.getGame().gold');
+  await evalJS("document.getElementById('btn-next').click()");
+  await sleep(250);
+  check('вторая волна запустилась во время первой', await evalJS('TD.UI.getGame().wave') === 2);
+  check('одновременно идут две волны', await evalJS('TD.UI.getGame().activeWaves.length') === 2);
+  check('за запуск в бою начислили бонус', await evalJS('TD.UI.getGame().gold') > goldBeforeOverlap);
+
+  /* зум колесом и сброс клавишей 0 */
+  const zoomTransform = await evalJS(`(function () {
+    var stage = document.querySelector('.stage');
+    var r = stage.getBoundingClientRect();
+    stage.dispatchEvent(new WheelEvent('wheel', {
+      deltaY: -400, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+      bubbles: true, cancelable: true
+    }));
+    return document.getElementById('game').style.transform;
+  })()`);
+  check('колесо приближает карту', /scale\(/.test(zoomTransform || ''), zoomTransform);
+  const zoomPoint = await evalJS(`(function () {
+    var cv = document.getElementById('game');
+    var r = cv.getBoundingClientRect();
+    cv.dispatchEvent(new MouseEvent('mousemove', {
+      clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, bubbles: true
+    }));
+    var p = TD.UI.getGame().pointer;
+    return { x: p.x, y: p.y };
+  })()`);
+  const mapW = await evalJS('TD.Config.width');
+  const mapH = await evalJS('TD.Config.height');
+  check('после зума курсор попадает в центр карты',
+    Math.abs(zoomPoint.x - mapW / 2) < 4 &&
+    Math.abs(zoomPoint.y - mapH / 2) < 4,
+    JSON.stringify(zoomPoint));
+  await evalJS("document.dispatchEvent(new KeyboardEvent('keydown', {key:'0', bubbles:true}))");
+  check('клавиша 0 сбрасывает масштаб', (await evalJS("document.getElementById('game').style.transform")) === '');
 
   await evalJS("document.querySelector('[data-speed=\"3\"]').click()");
   check('скорость 3× включилась', await evalJS('TD.UI.getGame().speed') === 3);
