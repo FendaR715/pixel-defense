@@ -33,13 +33,23 @@
     }
   };
 
-  function Game(levelIndex) {
+  function Game(levelIndex, opts) {
+    opts = opts || {};
+    var bonuses = opts.bonuses || {};
     this.levelIndex = TD.clamp(levelIndex || 0, 0, TD.Maps.length - 1);
     this.map = TD.Maps[this.levelIndex];
     this.grid = new TD.Grid(this.map);
 
-    this.gold = C.startGold;
-    this.lives = C.startLives;
+    /* Постоянная прокачка из меню: бонус к золоту за волну, стартовому
+       капиталу и жизням. По умолчанию всё по нулям (тесты и симуляция). */
+    this.bonuses = {
+      waveGold: Math.max(0, Math.floor(Number(bonuses.waveGold) || 0)),
+      startGold: Math.max(0, Math.floor(Number(bonuses.startGold) || 0)),
+      lives: Math.max(0, Math.floor(Number(bonuses.lives) || 0))
+    };
+
+    this.gold = C.startGold + this.bonuses.startGold;
+    this.lives = C.startLives + this.bonuses.lives;
     this.score = 0;
 
     this.wave = 0;
@@ -313,7 +323,7 @@
       resolved: 0,
       killed: 0,
       alive: 0,
-      reward: w.reward,
+      reward: w.reward + this.bonuses.waveGold,
       boss: w.boss
     };
     this.activeWaves.push(track);

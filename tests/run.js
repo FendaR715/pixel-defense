@@ -659,6 +659,63 @@ test('save: игра не падает без localStorage', () => {
   assert(d && typeof d.unlocked === 'number');
 });
 
+/* ---------- постоянная прокачка ---------- */
+
+test('meta: очки за забег копятся и тратятся на прокачку', () => {
+  TD.Save.reset();
+  assertEqual(TD.Save.load().points, 0, 'на старте очков нет');
+
+  const earned = TD.Save.record({ levelIndex: 0, score: 2000, wave: 4, win: false });
+  assertEqual(earned.earned, 2000, 'за забег начислили не те очки');
+  assertEqual(TD.Save.load().points, 2000, 'очки не попали в копилку');
+  assertEqual(TD.Save.load().stats.runs, 1);
+
+  const buy = TD.Save.buyUpgrade('waveGold');
+  assert(buy.ok, 'покупка не прошла: ' + buy.reason);
+  assertEqual(buy.level, 1);
+  assertEqual(buy.cost, 500);
+  assertEqual(TD.Save.load().points, 1500, 'очки не списались');
+  assertEqual(TD.Save.load().upgrades.waveGold, 1, 'уровень прокачки не вырос');
+  TD.Save.reset();
+});
+
+test('meta: прокачка ограничена очками и максимальным уровнем', () => {
+  TD.Save.reset();
+  const poor = TD.Save.buyUpgrade('waveGold');
+  assertEqual(poor.ok, false, 'купили прокачку без очков');
+  assertEqual(TD.Save.load().upgrades.waveGold, 0);
+
+  TD.Save.record({ levelIndex: 0, score: 100000, wave: 12, win: true });
+  const def = TD.MetaById.waveGold;
+  for (let i = 0; i < def.maxLevel; i++) {
+    assert(TD.Save.buyUpgrade('waveGold').ok, 'не купился уровень ' + (i + 1));
+  }
+  assertEqual(TD.Save.load().upgrades.waveGold, def.maxLevel);
+  assertEqual(TD.Save.buyUpgrade('waveGold').ok, false, 'купили сверх максимума');
+  assertEqual(TD.metaUpgradeCost('waveGold', def.maxLevel), null);
+  TD.Save.reset();
+});
+
+test('meta: бонусы прокачки применяются к новой партии', () => {
+  const bonuses = TD.metaBonuses({ waveGold: 2, startGold: 1, lives: 3 });
+  assertDeepEqual(bonuses, { waveGold: 6, startGold: 25, lives: 3 });
+
+  const g = new TD.Game(0, { bonuses: bonuses });
+  assertEqual(g.gold, TD.Config.startGold + 25, 'стартовое золото без бонуса');
+  assertEqual(g.lives, TD.Config.startLives + 3, 'жизни без бонуса');
+
+  g.startWave();
+  const tr = g.activeWaves[0];
+  const expected = TD.Config.waveRewardBase + TD.Config.waveRewardPerWave + 6;
+  assertEqual(tr.reward, expected, 'награда за волну без бонуса прокачки');
+
+  const goldBefore = g.gold;
+  tr.spawnIndex = tr.spawns.length;
+  tr.alive = 0;
+  g.checkWaveDone();
+  assertEqual(g.gold, goldBefore + expected, 'бонус не вошёл в выплату за волну');
+});
+
 /* ---------- итог ---------- */
 
 console.log('');

@@ -184,6 +184,28 @@ async function main() {
   await evalJS("document.querySelector('#screen-bestiary [data-action=\"menu\"]').click()");
   await sleep(150);
 
+  /* постоянная прокачка за очки */
+  await evalJS("document.querySelector('[data-action=\"upgrades\"]').click()");
+  await sleep(200);
+  check('экран прокачки открывается', await evalJS("!document.getElementById('screen-upgrades').classList.contains('hidden')"));
+  check('в прокачке 3 улучшения', (await evalJS("document.querySelectorAll('#upgrade-list .upg').length")) === 3);
+  check('без очков покупка недоступна', await evalJS("document.querySelector('[data-upgrade]') ? document.querySelector('[data-upgrade]').disabled : true") === true);
+
+  await evalJS("TD.Save.record({levelIndex: 0, score: 2500, wave: 3, win: false})");
+  await evalJS("document.querySelector('#screen-upgrades [data-action=\"menu\"]').click()");
+  await sleep(100);
+  await evalJS("document.querySelector('[data-action=\"upgrades\"]').click()");
+  await sleep(150);
+  check('очки за забег попали в копилку', await evalJS('TD.Save.load().points') === 2500);
+  check('на покупку хватает — кнопка активна', await evalJS("document.querySelector('[data-upgrade=\"waveGold\"]').disabled") === false);
+  await evalJS("document.querySelector('[data-upgrade=\"waveGold\"]').click()");
+  await sleep(150);
+  check('покупка списала очки', await evalJS('TD.Save.load().points') === 2000);
+  check('покупка подняла уровень', await evalJS('TD.Save.load().upgrades.waveGold') === 1);
+  await evalJS('TD.Save.reset()');
+  await evalJS("document.querySelector('#screen-upgrades [data-action=\"menu\"]').click()");
+  await sleep(100);
+
   /* старт игры через меню */
   await evalJS("document.querySelector('[data-action=\"play\"]').click()");
   await sleep(400);
@@ -323,6 +345,7 @@ async function main() {
   await evalJS(`(function () {
     var g = TD.UI.getGame();
     g.lives = 1;
+    g.score = 500;
     var e = g.spawnEnemy('slime');
     g.leakEnemy(e);
     return g.result;
@@ -330,6 +353,9 @@ async function main() {
   await sleep(400);
   check('поражение показало экран результата', await evalJS("!document.getElementById('screen-result').classList.contains('hidden')"));
   check('результат записан в сохранение', await evalJS('!!TD.Save.best(0)') === true);
+  check('на экране результата есть очки в копилку',
+    (await evalJS("document.getElementById('result-stats').textContent")).indexOf('В копилку') >= 0);
+  check('очки за забег начислены', await evalJS('TD.Save.load().points') >= 500);
   await evalJS("document.getElementById('btn-retry').click()");
   await sleep(400);
   check('кнопка «Заново» перезапускает уровень', await evalJS('!TD.UI.getGame().finished && TD.UI.getGame().lives === 20'));

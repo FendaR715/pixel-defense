@@ -232,4 +232,62 @@
     var byLevel = 1 + TD.Config.hpScalePerLevel * (levelIndex || 0);
     return byWave * byLevel;
   };
+
+  /* ================= постоянная прокачка =================
+     Покупается в меню за очки, заработанные за забеги (не за игровое золото).
+     Действует на все следующие партии. */
+  TD.MetaUpgrades = [
+    {
+      id: 'waveGold',
+      name: 'Добыча',
+      icon: '◈',
+      maxLevel: 5,
+      effect: 3,
+      unit: ' золота за волну',
+      effectText: '+3 золота к награде за каждую волну',
+      costs: [500, 1000, 1800, 3000, 4500]
+    },
+    {
+      id: 'startGold',
+      name: 'Стартовый капитал',
+      icon: '⊕',
+      maxLevel: 5,
+      effect: 25,
+      unit: ' золота на старте',
+      effectText: '+25 золота на старте партии',
+      costs: [400, 800, 1400, 2300, 3500]
+    },
+    {
+      id: 'lives',
+      name: 'Прочность сердца',
+      icon: '♥',
+      maxLevel: 3,
+      effect: 1,
+      unit: ' к жизням',
+      effectText: '+1 жизнь на старте партии',
+      costs: [1200, 2600, 4500]
+    }
+  ];
+
+  TD.MetaById = {};
+  TD.MetaUpgrades.forEach(function (u) { TD.MetaById[u.id] = u; });
+
+  /** Цена следующего уровня прокачки; null — максимум. */
+  TD.metaUpgradeCost = function (id, level) {
+    var def = TD.MetaById[id];
+    var lv = TD.clamp(level || 0, 0, def ? def.maxLevel : 0);
+    if (!def || lv >= def.maxLevel) return null;
+    return def.costs[lv];
+  };
+
+  /** Бонусы к новой партии по уровням прокачки. */
+  TD.metaBonuses = function (levels) {
+    var src = levels || {};
+    var out = { waveGold: 0, startGold: 0, lives: 0 };
+    TD.MetaUpgrades.forEach(function (u) {
+      var lv = TD.clamp(Math.floor(Number(src[u.id]) || 0), 0, u.maxLevel);
+      out[u.id] = lv * u.effect;
+    });
+    return out;
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

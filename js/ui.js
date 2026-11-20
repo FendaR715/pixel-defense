@@ -16,7 +16,10 @@
       return {
         unlocked: 1,
         best: {},
-        settings: { sound: true, grid: true, path: false }
+        settings: { sound: true, grid: true, path: false },
+        points: 0,
+        upgrades: { waveGold: 0, startGold: 0, lives: 0 },
+        stats: { runs: 0, earned: 0 }
       };
     }
 
@@ -43,6 +46,18 @@
         if (typeof raw.settings.grid === 'boolean') d.settings.grid = raw.settings.grid;
         if (typeof raw.settings.path === 'boolean') d.settings.path = raw.settings.path;
       }
+      if (typeof raw.points === 'number' && isFinite(raw.points)) {
+        d.points = Math.max(0, Math.floor(raw.points));
+      }
+      if (raw.upgrades && typeof raw.upgrades === 'object') {
+        TD.MetaUpgrades.forEach(function (u) {
+          d.upgrades[u.id] = TD.clamp(Math.floor(Number(raw.upgrades[u.id]) || 0), 0, u.maxLevel);
+        });
+      }
+      if (raw.stats && typeof raw.stats === 'object') {
+        d.stats.runs = Math.max(0, Math.floor(Number(raw.stats.runs) || 0));
+        d.stats.earned = Math.max(0, Math.floor(Number(raw.stats.earned) || 0));
+      }
       return d;
     }
 
@@ -66,8 +81,9 @@
       }
     }
 
+    /** Записывает результат забега. Очки идут и в рекорд, и в копилку прокачки. */
     function record(summary) {
-      if (!summary || typeof summary.levelIndex !== 'number') return;
+      if (!summary || typeof summary.levelIndex !== 'number') return null;
       var d = load();
       var key = String(summary.levelIndex);
       var prev = d.best[key];
@@ -85,7 +101,29 @@
       if (summary.win) {
         d.unlocked = TD.clamp(Math.max(d.unlocked, summary.levelIndex + 2), 1, TD.Maps.length);
       }
+      /* Заработанные за забег очки можно потратить в меню на прокачку. */
+      var earned = score;
+      d.points += earned;
+      d.stats.runs += 1;
+      d.stats.earned += earned;
       persist(d);
+      return { earned: earned, points: d.points };
+    }
+
+    function buyUpgrade(id) {
+      var def = TD.MetaById[id];
+      if (!def) return { ok: false, reason: 'Неизвестная прокачка' };
+      var d = load();
+      var level = d.upgrades[id] || 0;
+      if (level >= def.maxLevel) return { ok: false, reason: 'Уже максимальный уровень' };
+      var cost = TD.metaUpgradeCost(id, level);
+      if (d.points < cost) {
+        return { ok: false, reason: 'Не хватает очков: нужно ' + cost, need: cost };
+      }
+      d.points -= cost;
+      d.upgrades[id] = level + 1;
+      persist(d);
+      return { ok: true, level: level + 1, cost: cost, points: d.points };
     }
 
     function setSettings(settings) {
@@ -110,6 +148,7 @@
       defaults: defaults,
       load: load,
       record: record,
+      buyUpgrade: buyUpgrade,
       setSettings: setSettings,
       reset: reset,
       best: best
@@ -177,6 +216,9 @@
       els.optPath = $('opt-path');
       els.optGrid = $('opt-grid');
       els.optSound = $('opt-sound');
+      els.menuPoints = $('menu-points');
+      els.upgradePoints = $('upgrade-points');
+      els.upgradeList = $('upgrade-list');
       els.levelCards = $('level-cards');
       els.bestiaryTowers = $('bestiary-towers');
       els.bestiaryEnemies = $('bestiary-enemies');
@@ -192,6 +234,7 @@
         'screen-menu': $('screen-menu'),
         'screen-levels': $('screen-levels'),
         'screen-bestiary': $('screen-bestiary'),
+        'screen-upgrades': $('screen-upgrades'),
         'screen-scores': $('screen-scores'),
         'screen-help': $('screen-help'),
         'screen-result': $('screen-result'),
@@ -256,6 +299,8 @@
       state.screen = id || null;
       document.body.classList.toggle('has-screen', !!id && id !== 'screen-pause');
       if (id === 'screen-bestiary') renderBestiary();
+      if (id === 'screen-upgrades') renderUpgrades();
+      if (id === 'screen-menu') renderMenuPoints();
     }
 
     function hideAllScreens() {
@@ -515,7 +560,8 @@
         TD.Audio.play('error');
         return false;
       }
-      var g = new TD.Game(index);
+      var bonuses = TD.metaBonuses(Save.load().upgrades);
+      var g = new TD.Game(index, { bonuses: bonuses });
       g.onEvent = handleGameEvent;
       state.game = g;
       resetView();
@@ -579,15 +625,17 @@
     }
 
     function onGameEnd(summary) {
-      if (!state.testMode) Save.record(summary);
+      var earned = null;
+      if (!state.testMode) earned = Save.record(summary);
       TD.Audio.play(summary.win ? 'win' : 'lose');
-      showResult(summary);
+      showResult(summary, earned);
       renderLevelCards();
       renderScores();
+      renderMenuPoints();
       updateInspector();
     }
 
-    function showResult(summary) {
+    function showResult(summary, earned) {
       if (!els.resultTitle) return;
       els.resultTitle.textContent = summary.win ? 'Победа!' : 'Сердце пало';
       els.resultTitle.classList.toggle('is-lose', !summary.win);
@@ -602,6 +650,10 @@
         ['Жизни', summary.lives],
         ['Башен', summary.towers]
       ];
+      if (earned) {
+        stats.push(['В копилку', '+' + TD.fmtInt(earned.earned) + ' ★']);
+        stats.push(['Всего очков', TD.fmtInt(earned.points)]);
+      }
       els.resultStats.innerHTML = '';
       stats.forEach(function (row) {
         var div = document.createElement('div');
@@ -820,6 +872,71 @@
           tr.appendChild(td);
         });
         els.scoresBody.appendChild(tr);
+      });
+    }
+
+    /* ---------- постоянная прокачка ---------- */
+
+    function renderMenuPoints() {
+      var saved = Save.load();
+      setText(els.menuPoints, TD.fmtInt(saved.points));
+    }
+
+    function renderUpgrades() {
+      var saved = Save.load();
+      setText(els.upgradePoints, TD.fmtInt(saved.points));
+      if (!els.upgradeList) return;
+      els.upgradeList.innerHTML = '';
+      TD.MetaUpgrades.forEach(function (def) {
+        var level = saved.upgrades[def.id] || 0;
+        var maxed = level >= def.maxLevel;
+        var cost = maxed ? null : TD.metaUpgradeCost(def.id, level);
+
+        var card = document.createElement('div');
+        card.className = 'upg' + (maxed ? ' is-max' : '');
+
+        var top = document.createElement('div');
+        top.className = 'upg__top';
+        var icon = document.createElement('span');
+        icon.className = 'upg__icon';
+        icon.textContent = def.icon;
+        var name = document.createElement('span');
+        name.className = 'upg__name';
+        name.textContent = def.name;
+        var lvl = document.createElement('span');
+        lvl.className = 'upg__lvl';
+        lvl.textContent = 'ур. ' + level + ' / ' + def.maxLevel;
+        top.appendChild(icon);
+        top.appendChild(name);
+        top.appendChild(lvl);
+
+        var desc = document.createElement('p');
+        desc.className = 'upg__desc';
+        desc.textContent = def.effectText +
+          (level > 0 ? ' · сейчас +' + level * def.effect + def.unit : '');
+
+        var pips = document.createElement('div');
+        pips.className = 'upg__pips';
+        for (var i = 0; i < def.maxLevel; i++) {
+          var pip = document.createElement('span');
+          pip.className = 'upg__pip' + (i < level ? ' is-on' : '');
+          pips.appendChild(pip);
+        }
+
+        var buy = document.createElement('button');
+        buy.className = 'btn upg__buy' + (maxed ? '' : ' btn--accent');
+        buy.disabled = maxed || saved.points < cost;
+        buy.textContent = maxed ? 'Максимальный уровень' : 'Купить · ' + cost + ' ★';
+        if (!maxed && saved.points < cost) {
+          buy.title = 'Не хватает ' + (cost - saved.points) + ' очков';
+        }
+        if (!maxed) buy.dataset.upgrade = def.id;
+
+        card.appendChild(top);
+        card.appendChild(desc);
+        card.appendChild(pips);
+        card.appendChild(buy);
+        els.upgradeList.appendChild(card);
       });
     }
 
@@ -1091,12 +1208,30 @@
         Save.setSettings({ sound: state.sound, grid: state.grid, path: state.path });
       });
 
+      /* покупка постоянной прокачки */
+      document.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest('[data-upgrade]') : null;
+        if (!btn) return;
+        var res = Save.buyUpgrade(btn.dataset.upgrade);
+        if (res.ok) {
+          toast('Прокачка улучшена до уровня ' + res.level, 'good');
+          TD.Audio.play('upgrade');
+        } else {
+          toast(res.reason, 'warn');
+          TD.Audio.play('error');
+        }
+        renderUpgrades();
+        renderMenuPoints();
+      });
+
       if (els.btnReset) els.btnReset.addEventListener('click', function () {
-        if (root.confirm && !root.confirm('Сбросить все рекорды и прогресс?')) return;
+        if (root.confirm && !root.confirm('Сбросить рекорды, очки и прокачку?')) return;
         Save.reset();
         renderLevelCards();
         renderScores();
-        toast('Рекорды сброшены');
+        renderUpgrades();
+        renderMenuPoints();
+        toast('Рекорды и прокачка сброшены');
       });
 
       /* меню и экраны — делегирование */
@@ -1117,6 +1252,10 @@
         } else if (action === 'bestiary') {
           renderBestiary();
           showScreen('screen-bestiary');
+        } else if (action === 'upgrades') {
+          state.game = null;
+          renderUpgrades();
+          showScreen('screen-upgrades');
         } else if (action === 'scores') {
           renderScores();
           showScreen('screen-scores');

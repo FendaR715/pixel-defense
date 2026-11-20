@@ -100,11 +100,13 @@
     <div class="menu">
       <button class="btn btn--big btn--accent" data-action="play">Играть</button>
       <button class="btn btn--big" data-action="levels">Уровни</button>
+      <button class="btn btn--big" data-action="upgrades">Прокачка</button>
       <button class="btn btn--big" data-action="bestiary">Бестиарий</button>
       <button class="btn btn--big" data-action="scores">Рекорды</button>
       <button class="btn btn--big" data-action="help">Как играть</button>
     </div>
 
+    <p class="menu-points">Очки прокачки: <b id="menu-points">0</b> ★</p>
     <p class="hint">Прогресс сохраняется автоматически в этом браузере.</p>
     <p class="menu-credit">Ассеты: CraftPix · v1.0</p>
   </div>
@@ -128,6 +130,17 @@
       <div class="bestiary__grid" id="bestiary-enemies"></div>
     </div>
     <p class="hint">Наведите курсор на врага или башню в бою — появится подсказка с названием.</p>
+    <button class="btn" data-action="menu">← В меню</button>
+  </div>
+</section>
+
+<section class="screen hidden" id="screen-upgrades">
+  <div class="screen__inner screen__inner--wide">
+    <h2 class="screen__title">Прокачка</h2>
+    <p class="upgrades__points">Доступно очков: <b id="upgrade-points">0</b> ★</p>
+    <div class="upgrades" id="upgrade-list"></div>
+    <p class="hint">Очки начисляются за каждый забег: убийства, пройденные волны и победа.
+       Прокачка постоянная, покупается за очки и не тратит золото в бою.</p>
     <button class="btn" data-action="menu">← В меню</button>
   </div>
 </section>
@@ -168,6 +181,12 @@
         <p>Следующую волну можно запустить, <b>пока идёт текущая</b>: за это начисляют бонус
            золотом. Врагов на поле станет больше одновременно — зато денег хватит на новые
            башни. Кнопка «Волна» показывает номер следующей волны и сумму бонуса.</p>
+
+        <h3>Прокачка</h3>
+        <p>За каждый забег — даже проигранный — начисляются очки (они равны итоговому счёту).
+           В меню «Прокачка» очки тратятся на постоянные улучшения: «Добыча» даёт больше
+           золота за волну, «Стартовый капитал» — золото на старте, «Прочность сердца» —
+           дополнительную жизнь. Это не игровое золото: экономика партии и прокачка разделены.</p>
 
         <h3>Подсказки</h3>
         <p>Наведите курсор на врага — появится запас HP и сколько жизней он снимет, если
@@ -212,6 +231,7 @@
     <div class="result__grid" id="result-stats"></div>
     <div class="row">
       <button class="btn btn--accent" id="btn-retry">Заново</button>
+      <button class="btn" data-action="upgrades">Прокачка</button>
       <button class="btn" data-action="levels">К уровням</button>
       <button class="btn" data-action="menu">В меню</button>
     </div>
