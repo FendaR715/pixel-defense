@@ -95,14 +95,17 @@
     this.pathCells = [];
     this.routeCells = this.grid.getPath();
     this.refreshPath();
-    this.decor = this.buildDecor();
+    /* Сначала площадки и лагеря, затем декор: тяжёлые объекты не должны
+       закрывать места под башни и друг друга. */
     this.spots = this.computeSpots(C.buildSpots);
     this.spotKeys = {};
     for (var si = 0; si < this.spots.length; si++) {
       this.spotKeys[this.spots[si].c + ',' + this.spots[si].r] = true;
     }
     this.camps = this.findCamps();
-  }
+    this.heavyKeys = {};
+    this.decor = this.buildDecor();
+  };
 
   /** Уголки карты под декоративные палатки (не на маршруте). */
   Game.prototype.findCamps = function () {
@@ -119,7 +122,7 @@
       if (this.onPath(p.c, p.r)) continue;
       if (this.grid.spawn.c === p.c && this.grid.spawn.r === p.r) continue;
       if (this.grid.base.c === p.c && this.grid.base.r === p.r) continue;
-      if (this.isSpot(p.c, p.r)) continue;
+      if (this.nearSpot(p.c, p.r, 1)) continue;
       out.push(p);
     }
     return out.slice(0, 3);
@@ -194,6 +197,59 @@
     return null;
   };
 
+  /* ================= проверки декора ================= */
+
+  Game.prototype.nearPath = function (c, r, radius) {
+    for (var dr = -radius; dr <= radius; dr++) {
+      for (var dc = -radius; dc <= radius; dc++) {
+        if (this.onPath(c + dc, r + dr)) return true;
+      }
+    }
+    return false;
+  };
+
+  /** Клетка рядом с площадкой (включая её саму): там декору не место. */
+  Game.prototype.nearSpot = function (c, r, radius) {
+    var rad = radius == null ? 1 : radius;
+    for (var dr = -rad; dr <= rad; dr++) {
+      for (var dc = -rad; dc <= rad; dc++) {
+        if (this.isSpot(c + dc, r + dr)) return true;
+      }
+    }
+    return false;
+  };
+
+  Game.prototype.nearCamp = function (c, r) {
+    for (var i = 0; i < this.camps.length; i++) {
+      if (Math.abs(this.camps[i].c - c) <= 1 && Math.abs(this.camps[i].r - r) <= 1) return true;
+    }
+    return false;
+  };
+
+  Game.prototype.heavyAt = function (c, r) {
+    return !!this.heavyKeys[c + ',' + r];
+  };
+
+  /** Можно ли поставить крупный объект: не на площадке, не у дороги,
+      не в лагере и не вплотную к другому крупному объекту или скале. */
+  Game.prototype.canPlaceHeavy = function (c, r) {
+    if (this.nearSpot(c, r, 1)) return false;
+    if (this.onPath(c, r)) return false;
+    if (c < 1 || c > this.grid.cols - 2 || r < 1 || r > this.grid.rows - 2) return false;
+    if (this.nearPath(c, r, 1) || this.nearCamp(c, r)) return false;
+    for (var dr = -1; dr <= 1; dr++) {
+      for (var dc = -1; dc <= 1; dc++) {
+        if (this.heavyAt(c + dc, r + dr)) return false;
+        if (this.grid.at(c + dc, r + dr) === '#') return false;
+      }
+    }
+    return true;
+  };
+
+  Game.prototype.markHeavy = function (c, r) {
+    this.heavyKeys[c + ',' + r] = true;
+  };
+
   /* ================= события и звук ================= */
 
   Game.prototype.emit = function (type, data) {
@@ -213,22 +269,33 @@
   Game.prototype.buildDecor = function () {
     var out = [];
     var seed = TD.hash('decor:' + this.levelIndex);
+    this.heavyKeys = {};
     for (var r = 0; r < this.grid.rows; r++) {
       for (var c = 0; c < this.grid.cols; c++) {
         var ch = this.grid.at(c, r);
         var n = TD.noise2(c, r, seed);
         var n2 = TD.noise2(c + 13, r + 7, seed);
         var n3 = TD.noise2(c + 41, r + 23, seed);
+        var onSpot = this.isSpot(c, r);
+        var heavy = !onSpot && this.canPlaceHeavy(c, r);
+
+        /* крупные объекты — деревья, кусты, брёвна и ящики — ставим с
+           промежутком и только вне площадок, дороги и лагерей */
+        var bush = heavy && (ch === '.' || ch === ',') && n > 0.975;
+        var shrub = heavy && ch === '.' && n2 > 0.84 && n2 < 0.89;
+        var prop = heavy && ch === '.' && n3 > 0.94;
+        if (bush || shrub || prop) this.markHeavy(c, r);
+
         out.push({
           c: c, r: r, ch: ch,
-          dot: n > 0.45,
-          bush: (ch === '.' || ch === ',') && n > 0.975,
-          shrub: ch === '.' && n2 > 0.84 && n2 < 0.89,
-          flower: ch === '.' && n2 > 0.9,
+          dot: !onSpot && n > 0.45,
+          bush: bush,
+          shrub: shrub,
+          flower: !onSpot && ch === '.' && n2 > 0.9,
           flowerWarm: n > 0.5,
-          tuft: (ch === '.' || ch === ',') && n > 0.46 && n < 0.6,
-          patch: ch === '.' && n2 > 0.8 && n2 < 0.84,
-          prop: ch === '.' && n3 > 0.94,
+          tuft: !onSpot && (ch === '.' || ch === ',') && n > 0.46 && n < 0.6,
+          patch: !onSpot && ch === '.' && n2 > 0.8 && n2 < 0.84,
+          prop: prop,
           propType: (n3 > 0.97 ? 'box' : 'log'),
           pebble: false,
           flip: n > 0.5,
@@ -1328,6 +1395,7 @@
         var nr = p.r + dirs[d][1];
         if (this.grid.at(nc, nr) !== '.') continue;
         if (this.onPath(nc, nr)) continue;
+        if (this.nearSpot(nc, nr, 1) || this.heavyAt(nc, nr)) continue;
         var lx = nc * cell;
         var ly = nr * cell;
         lampNo += 1;
@@ -1361,7 +1429,7 @@
         var nr = p.r + dirs[d][1];
         if (this.grid.at(nc, nr) !== '.') continue;
         if (this.onPath(nc, nr)) continue;
-        if (this.isSpot(nc, nr)) continue;
+        if (this.nearSpot(nc, nr, 1) || this.heavyAt(nc, nr)) continue;
         put += 1;
         var ptrKey = 'pointer' + (1 + put % 6);
         var ptrInfo = A.size(ptrKey);
@@ -1388,8 +1456,9 @@
         var nr = p.r + dirs[d][1];
         if (this.grid.at(nc, nr) !== '.') continue;
         if (this.onPath(nc, nr)) continue;
-        if (this.isSpot(nc, nr)) continue;
+        if (this.nearSpot(nc, nr, 1)) continue;
         if (this.towerAt(nc, nr)) continue;
+        if (this.heavyAt(nc, nr)) continue;
         put += 1;
         var fenceKey = 'fence' + (1 + put % 10);
         var fenceInfo = A.size(fenceKey);
@@ -1498,24 +1567,36 @@
     ctx.restore();
   };
 
-  /** Площадки под башни: видны всегда, подсвечиваются при выборе башни. */
+  /** Площадки под башни: заметные площадки с золотыми уголками и значком «+». */
   Game.prototype.drawSpots = function (ctx) {
     var A = TD.Assets;
     var cell = this.grid.cell;
     var k = cell / 40;
-    var pad = 62;
 
     for (var i = 0; i < this.spots.length; i++) {
       var s = this.spots[i];
       var center = this.grid.cellCenter(s.c, s.r);
       var occupied = !!this.towerAt(s.c, s.r);
+      var free = !occupied;
+      var hovered = this.hover.c === s.c && this.hover.r === s.r;
+
+      /* мягкая тень, чтобы площадка не сливалась с травой */
+      ctx.save();
+      ctx.fillStyle = free ? 'rgba(24,30,14,0.30)' : 'rgba(24,30,14,0.18)';
+      ctx.beginPath();
+      ctx.ellipse(center.x, center.y + cell * 0.33, cell * 0.30, cell * 0.10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      this.glow(ctx, center.x, center.y + cell * 0.06, cell * 0.44,
+        free ? 'rgba(255,205,96,0.30)' : 'rgba(255,205,96,0.10)');
 
       if (A && A.has('towerPlace1')) {
+        var pad = free ? cell + 12 : cell + 6;
         A.draw(ctx, i % 2 ? 'towerPlace2' : 'towerPlace1',
           center.x - pad / 2, center.y - pad / 2 + 2, pad, pad);
-      } else if (!occupied) {
+      } else if (free) {
         ctx.save();
-        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.30)';
         ctx.setLineDash([5 * k, 4 * k]);
         ctx.beginPath();
         ctx.arc(center.x, center.y, 15 * k, 0, Math.PI * 2);
@@ -1525,11 +1606,72 @@
 
       if (occupied) continue;
 
-      var hovered = this.hover.c === s.c && this.hover.r === s.r;
+      /* золотые уголки по краям клетки — читаются как «место под башню» */
+      var inset = 4 * k;
+      var arm = 13 * k;
+      var x0 = s.c * cell + inset;
+      var y0 = s.r * cell + inset;
+      var x1 = (s.c + 1) * cell - inset;
+      var y1 = (s.r + 1) * cell - inset;
+      ctx.save();
+      ctx.lineCap = 'square';
+      for (var pass = 0; pass < 2; pass++) {
+        ctx.strokeStyle = pass ? '#ffe6a3' : 'rgba(30,21,8,0.6)';
+        ctx.lineWidth = pass ? 2.4 * k : 5 * k;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0 + arm); ctx.lineTo(x0, y0); ctx.lineTo(x0 + arm, y0);
+        ctx.moveTo(x1 - arm, y0); ctx.lineTo(x1, y0); ctx.lineTo(x1, y0 + arm);
+        ctx.moveTo(x1, y1 - arm); ctx.lineTo(x1, y1); ctx.lineTo(x1 - arm, y1);
+        ctx.moveTo(x0 + arm, y1); ctx.lineTo(x0, y1); ctx.lineTo(x0, y1 - arm);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      /* пульсирующее кольцо вокруг платформы */
+      var pulse = 0.5 + 0.5 * Math.sin(this.time * 3 + i * 1.7);
+      ctx.save();
+      ctx.globalAlpha = 0.40 + 0.35 * pulse;
+      ctx.strokeStyle = hovered ? '#fff3c4' : '#ffd166';
+      ctx.lineWidth = 2 * k;
+      ctx.setLineDash([4 * k, 4 * k]);
+      ctx.beginPath();
+      ctx.arc(center.x, center.y + 2 * k, cell * 0.36, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      /* значок «+» в углу клетки */
+      var bx = x1 - 9 * k;
+      var by = y0 + 9 * k;
+      ctx.save();
+      ctx.fillStyle = 'rgba(28,21,10,0.78)';
+      ctx.beginPath();
+      ctx.arc(bx, by, 8 * k, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffd166';
+      ctx.lineWidth = 1.5 * k;
+      ctx.stroke();
+      ctx.strokeStyle = '#ffe9a8';
+      ctx.lineWidth = 2.4 * k;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(bx - 4 * k, by); ctx.lineTo(bx + 4 * k, by);
+      ctx.moveTo(bx, by - 4 * k); ctx.lineTo(bx, by + 4 * k);
+      ctx.stroke();
+      ctx.restore();
+
+      /* при выборе башни клетка подсвечивается: зелёная — можно, красная — нет */
       if (this.buildType || hovered) {
+        if (this.buildType) {
+          ctx.fillStyle = hovered
+            ? (this.hover.ok ? 'rgba(61,220,151,0.20)' : 'rgba(239,71,111,0.22)')
+            : 'rgba(61,220,151,0.06)';
+          ctx.fillRect(s.c * cell + 2, s.r * cell + 2, cell - 4, cell - 4);
+        }
         ctx.save();
         ctx.globalAlpha = 0.55 + 0.35 * Math.sin(this.time * 4 + i);
-        ctx.strokeStyle = this.buildType ? (hovered && this.hover.ok ? '#c9ffcb' : '#9af09f') : '#fff2c2';
+        ctx.strokeStyle = this.buildType
+          ? (hovered && this.hover.ok ? '#c9ffcb' : '#9af09f')
+          : '#fff2c2';
         ctx.lineWidth = 2 * k;
         ctx.setLineDash([5 * k, 5 * k]);
         ctx.beginPath();

@@ -354,6 +354,34 @@ test('game: площадки под башни заданы и безопасн�
   });
 });
 
+test('game: декор не закрывает площадки и не налезает друг на друга', () => {
+  TD.Maps.forEach((map, level) => {
+    const g = new TD.Game(level);
+    const heavy = [];
+    g.decor.forEach((d) => {
+      if (d.bush || d.shrub || d.prop) {
+        heavy.push(d);
+        assert(!g.isSpot(d.c, d.r), map.name + ': крупный декор на площадке ' + d.c + ',' + d.r);
+        assert(!g.nearSpot(d.c, d.r, 1), map.name + ': декор вплотную к площадке ' + d.c + ',' + d.r);
+        assert(!g.nearPath(d.c, d.r, 1), map.name + ': декор налезает на дорогу ' + d.c + ',' + d.r);
+      } else {
+        assert(!g.isSpot(d.c, d.r) || (!d.dot && !d.flower && !d.tuft && !d.patch),
+          map.name + ': мелкий декор на площадке ' + d.c + ',' + d.r);
+      }
+    });
+    for (let i = 0; i < heavy.length; i++) {
+      for (let j = i + 1; j < heavy.length; j++) {
+        const a = heavy[i];
+        const b = heavy[j];
+        assert(Math.abs(a.c - b.c) > 1 || Math.abs(a.r - b.r) > 1,
+          map.name + ': крупный декор налезает (' + a.c + ',' + a.r + ') и (' + b.c + ',' + b.r + ')');
+      }
+    }
+    assert(heavy.length >= 4, map.name + ': декор почти исчез (' + heavy.length + ')');
+    assertEqual(g.spots.length, TD.Config.buildSpots, map.name + ': число площадок');
+  });
+});
+
 test('game: стартовые ресурсы', () => {
   const g = new TD.Game(0);
   assertEqual(g.gold, TD.Config.startGold);
